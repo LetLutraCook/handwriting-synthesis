@@ -3,35 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Handwriting Trainer</title>
+    <title>Lutra Handwriting AI</title>
     <style>
-        body { font-family: sans-serif; touch-action: none; overflow: hidden; background: #f4f4f9; display: flex; flex-direction: column; height: 100vh; margin: 0; }
-        #train-zone { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        canvas { background: white; border: 2px solid #333; cursor: crosshair; touch-action: none; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
-        #controls { padding: 20px; background: white; border-top: 1px solid #ddd; }
-        button { padding: 10px 20px; font-weight: bold; cursor: pointer; margin-right: 10px; }
-        textarea { width: 100%; margin-top: 10px; height: 60px; }
+        :root { --primary: #2563eb; --success: #16a34a; --bg: #f8fafc; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); margin: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        
+        /* Mobile drawing lock */
+        canvas { touch-action: none; background: white; border: 2px solid #cbd5e1; border-radius: 8px; cursor: crosshair; }
+        
+        header { padding: 1rem; background: white; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+        .container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1rem; overflow-y: auto; }
+        
+        .controls { background: white; padding: 1.5rem; border-top: 1px solid #e2e8f0; display: grid; gap: 1rem; }
+        button { padding: 0.75rem 1.25rem; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+        .btn-prime { background: var(--primary); color: white; }
+        .btn-save { background: var(--success); color: white; }
+        
+        textarea { width: 100%; height: 80px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.5rem; box-sizing: border-box; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
 
-<div id="train-zone">
-    <h2 id="prompt">Draw: A</h2>
+<header>
+    <h2 id="status">Mode: Training (<span id="char-prompt">A</span>)</h2>
+    <button onclick="toggleMode()" class="btn-prime">Switch to Type Mode</button>
+</header>
+
+<div class="container" id="training-ui">
     <canvas id="drawCanvas" width="300" height="300"></canvas>
-    <div style="margin-top:10px;">
+    <div>
         <button onclick="clearCanvas()">Clear</button>
-        <button onclick="saveLetter()" style="background: #4CAF50; color: white;">Save & Next</button>
+        <button class="btn-save" onclick="saveCurrentLetter()">Save & Next</button>
     </div>
 </div>
 
-<div id="controls">
-    <button onclick="downloadModel()">Download Model (.json)</button>
-    <input type="file" id="uploadModel" style="display:none" onchange="loadModel(event)">
-    <button onclick="document.getElementById('uploadModel').click()">Upload Model</button>
-    <textarea id="testInput" placeholder="Type here to see your AI handwriting..."></textarea>
-    <canvas id="outputCanvas" width="800" height="200" style="width:100%; height:auto; margin-top:10px;"></canvas>
+<div class="container hidden" id="typing-ui">
+    <textarea id="textInput" placeholder="Type here to see your AI handwriting..."></textarea>
+    <canvas id="outputCanvas" width="800" height="400" style="width: 100%; height: auto;"></canvas>
 </div>
 
-<script src="script.js"></script>
+<div class="controls">
+    <div style="display: flex; gap: 10px;">
+        <button onclick="downloadModel()">Download Model</button>
+        <button onclick="document.getElementById('fileInput').click()">Upload Model</button>
+        <input type="file" id="fileInput" class="hidden" onchange="loadModel(event)">
+    </div>
+</div>
+
+<script>
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?! ";
+    let currentIdx = 0;
+    let modelData = {}; 
+    let isDrawing = false;
+    let currentStroke = []; // Array of {x, y}
+
+    const dCanvas = document.getElementById('drawCanvas');
+    const dCtx = dCanvas.getContext('2d');
+    const oCanvas = document.getElementById('outputCanvas');
+    const oCtx = oCanvas.getContext('2d');
+
+    // --- DRAWING CORE ---
+    function getPos(e) {
+        const rect = dCanvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: clientX - rect.left, y: clientY - rect.top };
+    }
+
+    function start(e) {
+        e.preventDefault();
+        isDrawing = true;
+        const pos = getPos(e);
+        dCtx.beginPath();
+        dCtx.moveTo(pos.x, pos.y);
+        currentStroke = [{x: pos.x, y: pos.y}];
+    }
+
+    function move(e) {
+        if (!isDrawing) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        dCtx.lineWidth = 3;
+        dCtx.lineCap = 'round';
+        dCtx.strokeStyle = '#000';
+        dCtx.lineTo(pos.x, pos.y);
+        dCtx.stroke();
+        currentStroke.push({x: pos.x, y: pos.y});
+    }
+
+    function stop() { isDrawing = false; }
+
+    dCanvas.addEventListener('touchstart', start, {passive: false});
+    dCanvas.addEventListener('touchmove', move, {passive: false});
+    dCanvas.addEventListener('touchend', stop);
+    dCanvas.addEventListener('mousedown', start);
+    window.addEventListener('mousemove', (e) => { if(isDrawing) move(e); });
+    window.addEventListener('mouseup', stop);
+
+    // --- LOGIC ---
+    function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); }
+
+    function saveCurrentLetter() {
+        const char = alphabet[currentIdx];
+        if (!modelData[char]) modelData[char] = [];
+        modelData[char].push(currentStroke);
+        
+        currentIdx++;
+        if (currentIdx < alphabet.length) {
+            document.getElementById('char-prompt').innerText = alphabet[currentIdx];
+        } else {
+            alert("Alphabet complete! You can now switch to Type Mode.");
+        }
+        clearCanvas();
+    }
+
+    function toggleMode() {
+        document.getElementById('training-ui').classList.toggle('hidden');
+        document.getElementById('typing-ui').classList.toggle('hidden');
+        const isType = !document.getElementById('typing-ui').classList.contains('hidden');
+        document.getElementById('status').innerText = isType ? "Mode: Typing" : `Mode: Training (${alphabet[currentIdx]})`;
+    }
+
+    // --- RENDERING ENGINE (WARPING) ---
+    document.getElementById('textInput').addEventListener('input', (e) => {
+        renderHandwriting(e.target.value);
+    });
+
+    function renderHandwriting(text) {
+        oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
+        let curX = 20;
+        let curY = 40;
+        const scale = 0.15; // Shrink the 300px drawing to text size
+
+        for (let char of text) {
+            if (char === ' ') { curX += 30; continue; }
+            if (char === '\n') { curX = 20; curY += 60; continue; }
+
+            const strokes = modelData[char];
+            if (strokes && strokes.length > 0) {
+                const rawPath = strokes[Math.floor(Math.random() * strokes.length)];
+                
+                oCtx.beginPath();
+                oCtx.lineWidth = 2;
+                
+                rawPath.forEach((pt, i) => {
+                    // THE WARP: Add random noise to each point
+                    const jitterX = (Math.random() - 0.5) * 2;
+                    const jitterY = (Math.random() - 0.5) * 2;
+                    
+                    const drawX = curX + (pt.x * scale) + jitterX;
+                    const drawY = curY + (pt.y * scale) + jitterY;
+                    
+                    if (i === 0) oCtx.moveTo(drawX, drawY);
+                    else oCtx.lineTo(drawX, drawY);
+                });
+                oCtx.stroke();
+            }
+            curX += 40;
+            if (curX > oCanvas.width - 40) { curX = 20; curY += 80; }
+        }
+    }
+
+    // --- FILE I/O ---
+    function downloadModel() {
+        const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'my_handwriting_model.json';
+        a.click();
+    }
+
+    function loadModel(e) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            modelData = JSON.parse(event.target.result);
+            alert("Model loaded successfully!");
+        };
+        reader.readAsText(e.target.files[0]);
+    }
+</script>
 </body>
 </html>
