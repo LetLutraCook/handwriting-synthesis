@@ -1,70 +1,72 @@
-const canvas = document.getElementById('writingCanvas');
+const canvas = document.getElementById('drawCanvas');
 const ctx = canvas.getContext('2d');
-const input = document.getElementById('textInput');
+const outputCanvas = document.getElementById('outputCanvas');
+const oCtx = outputCanvas.getContext('2d');
+const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+let currentIdx = 0;
+let modelData = {}; // Stores { 'A': [ {points: []}, ... ] }
+let currentStroke = [];
 
-// Settings for realism
-const charWidth = 30;   // Base width of letters
-const charHeight = 40;  // Base height
-const lineSpacing = 60; // Space between lines
-const startX = 20;
-const startY = 60;
+// --- DRAWING LOGIC (Mobile & Desktop) ---
+function startDrawing(e) {
+    e.preventDefault();
+    ctx.beginPath();
+    currentStroke = [];
+}
 
-input.addEventListener('input', () => {
-    renderText(input.value);
-});
-
-async function renderText(text) {
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+function draw(e) {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
     
-    let cursorX = startX;
-    let cursorY = startY;
-
-    for (let char of text) {
-        if (char === '\n') {
-            cursorX = startX;
-            cursorY += lineSpacing;
-            continue;
-        }
-
-        if (char === ' ') {
-            cursorX += charWidth * 0.8;
-            continue;
-        }
-
-        // Only process letters (a-z, A-Z)
-        if (/[a-zA-Z]/.test(char)) {
-            // Randomly pick variation 1 through 5
-            const variation = Math.floor(Math.random() * 5) + 1;
-            const imgPath = `images/${char}-${variation}.png`;
-
-            await drawLetter(imgPath, cursorX, cursorY);
-        }
-
-        // Move cursor with a tiny bit of random spacing (kerning jitter)
-        cursorX += charWidth + (Math.random() * 4 - 2);
-
-        // Wrap text if it hits the edge
-        if (cursorX > canvas.width - 50) {
-            cursorX = startX;
-            cursorY += lineSpacing;
-        }
-    }
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    currentStroke.push({x, y});
 }
 
-function drawLetter(path, x, y) {
-    return new Promise((resolve) => {
-        const img = new Image();
-        img.src = path;
-        img.onload = () => {
-            // Add vertical jitter so letters aren't perfectly aligned
-            const jitterY = (Math.random() * 4 - 2);
-            
-            // Draw the letter
-            ctx.drawImage(img, x, y + jitterY, charWidth, charHeight);
-            resolve();
-        };
-        // If image fails to load (missing file), just skip it
-        img.onerror = () => resolve();
-    });
+canvas.addEventListener('mousedown', startDrawing);
+canvas.addEventListener('mousemove', (e) => e.buttons === 1 && draw(e));
+canvas.addEventListener('touchstart', startDrawing);
+canvas.addEventListener('touchmove', draw);
+
+// --- WARPING ENGINE ---
+function getWarpedStroke(stroke) {
+    const intensity = 1.5; // How "shaky" the variation is
+    return stroke.map(p => ({
+        x: p.x + (Math.random() - 0.5) * intensity,
+        y: p.y + (Math.random() - 0.5) * intensity
+    }));
 }
+
+// --- SAVE & LOAD ---
+function saveLetter() {
+    const char = alphabet[currentIdx];
+    if (!modelData[char]) modelData[char] = [];
+    modelData[char].push(currentStroke);
+    
+    currentIdx++;
+    document.getElementById('prompt').innerText = `Draw: ${alphabet[currentIdx]}`;
+    clearCanvas();
+}
+
+function downloadModel() {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(modelData));
+    const downloadAnchorNode = document.createElement('a');
+    downloadAnchorNode.setAttribute("href", dataStr);
+    downloadAnchorNode.setAttribute("download", "my_handwriting.json");
+    downloadAnchorNode.click();
+}
+
+function loadModel(event) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        modelData = JSON.parse(e.target.result);
+        alert("Model Loaded!");
+    };
+    reader.readAsText(event.target.files[0]);
+}
+
+function clearCanvas() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
