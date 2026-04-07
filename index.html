@@ -3,30 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Lutra Handwriting AI</title>
+    <title>Lutra Handwriting AI v3</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; }
-        /* Removed overflow:hidden to allow page scrolling */
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); margin: 0; color: #1e293b; min-height: 100vh; display: flex; flex-direction: column; }
-        
-        header { background: var(--panel); padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; sticky; top: 0; z-index: 100; }
+        header { background: var(--panel); padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
         .mode-indicator { font-weight: 700; color: var(--primary); }
-        
         .main-container { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.5rem; gap: 1.5rem; }
-        
-        /* Training UI */
         .draw-card { background: var(--panel); padding: 1.5rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; width: 100%; max-width: 350px; }
-        canvas { background: #fafafa; border: 2px dashed #cbd5e1; border-radius: 12px; touch-action: none; cursor: crosshair; }
-        
-        /* Type Mode UI */
+        /* High-quality canvas styling */
+        canvas { background: #fff; border: 2px solid #cbd5e1; border-radius: 12px; touch-action: none; cursor: crosshair; image-rendering: -webkit-optimize-contrast; }
         .type-area { width: 100%; max-width: 800px; display: flex; flex-direction: column; gap: 1rem; }
-        textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; font-size: 1rem; resize: vertical; min-height: 80px; outline: none; }
+        textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; font-size: 1rem; outline: none; }
         #outputCanvas { background: white; border-radius: 12px; border: 1px solid #e2e8f0; width: 100%; height: auto; }
-
         .btn-group { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: center; flex-wrap: wrap; }
         button { padding: 0.6rem 1rem; border-radius: 8px; border: 1px solid #e2e8f0; background: white; font-weight: 600; cursor: pointer; }
         .btn-filled { background: var(--primary); color: white; border: none; }
-
         footer { padding: 1.5rem; background: #fff; border-top: 1px solid #e2e8f0; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: auto; }
         .hidden { display: none !important; }
     </style>
@@ -48,7 +40,7 @@
     </div>
 
     <div id="typing-ui" class="type-area hidden">
-        <textarea id="textInput" placeholder="Start typing your letters..."></textarea>
+        <textarea id="textInput" placeholder="Type multi-stroke letters..."></textarea>
         <canvas id="outputCanvas" width="1000" height="600"></canvas>
     </div>
 </div>
@@ -64,12 +56,23 @@
     let currentIdx = 0;
     let modelData = {}; 
     let isDrawing = false;
+    let allStrokes = []; // Array of strokes: [ [{x,y}, {x,y}], [{x,y}] ]
     let currentStroke = [];
 
     const dCanvas = document.getElementById('drawCanvas');
     const dCtx = dCanvas.getContext('2d');
     const oCanvas = document.getElementById('outputCanvas');
     const oCtx = oCanvas.getContext('2d');
+
+    // --- HIGH-DPI CANVAS FIX ---
+    function setupCanvas(canvas, ctx) {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+        ctx.scale(dpr, dpr);
+    }
+    setupCanvas(dCanvas, dCtx);
 
     function getPos(e) {
         const rect = dCanvas.getBoundingClientRect();
@@ -83,9 +86,9 @@
             e.preventDefault();
             isDrawing = true;
             const pos = getPos(e);
+            currentStroke = [{x: pos.x, y: pos.y}];
             dCtx.beginPath();
             dCtx.moveTo(pos.x, pos.y);
-            currentStroke = [{x: pos.x, y: pos.y}];
         }
     }
 
@@ -93,39 +96,51 @@
         if (!isDrawing) return;
         e.preventDefault();
         const pos = getPos(e);
-        dCtx.lineWidth = 4;
+        dCtx.lineWidth = 3;
         dCtx.lineCap = 'round';
+        dCtx.lineJoin = 'round';
         dCtx.strokeStyle = '#1e293b';
         dCtx.lineTo(pos.x, pos.y);
         dCtx.stroke();
         currentStroke.push({x: pos.x, y: pos.y});
     }
 
+    function end() {
+        if (isDrawing) {
+            allStrokes.push(currentStroke);
+            isDrawing = false;
+        }
+    }
+
     dCanvas.addEventListener('touchstart', start, {passive: false});
     dCanvas.addEventListener('touchmove', move, {passive: false});
-    dCanvas.addEventListener('touchend', () => isDrawing = false);
+    dCanvas.addEventListener('touchend', end);
     dCanvas.addEventListener('mousedown', start);
     window.addEventListener('mousemove', (e) => isDrawing && move(e));
-    window.addEventListener('mouseup', () => isDrawing = false);
+    window.addEventListener('mouseup', end);
 
-    function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); }
+    function clearCanvas() { 
+        dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); 
+        allStrokes = [];
+    }
 
     function saveCurrentLetter() {
-        if (currentStroke.length < 2) return;
+        if (allStrokes.length === 0) return;
 
-        const minX = Math.min(...currentStroke.map(p => p.x));
-        const maxX = Math.max(...currentStroke.map(p => p.x));
-        const minY = Math.min(...currentStroke.map(p => p.y));
+        // Find global bounds across all strokes
+        const flatPoints = allStrokes.flat();
+        const minX = Math.min(...flatPoints.map(p => p.x));
+        const maxX = Math.max(...flatPoints.map(p => p.x));
+        const minY = Math.min(...flatPoints.map(p => p.y));
         
-        // Normalization with "Actual Width" tracking
-        const normalized = {
-            points: currentStroke.map(p => ({ x: p.x - minX, y: p.y - minY })),
-            width: maxX - minX
-        };
+        // Normalize each stroke relative to the letter's top-left
+        const normalizedStrokes = allStrokes.map(stroke => 
+            stroke.map(p => ({ x: p.x - minX, y: p.y - minY }))
+        );
 
         const char = alphabet[currentIdx];
         if (!modelData[char]) modelData[char] = [];
-        modelData[char].push(normalized);
+        modelData[char].push({ strokes: normalizedStrokes, width: maxX - minX });
         
         currentIdx++;
         if (currentIdx < alphabet.length) {
@@ -137,8 +152,10 @@
     function toggleMode() {
         document.getElementById('training-ui').classList.toggle('hidden');
         document.getElementById('typing-ui').classList.toggle('hidden');
-        const isType = !document.getElementById('typing-ui').classList.contains('hidden');
-        document.getElementById('status').innerHTML = isType ? "MODE: TYPING" : `TRAINING: <span id="char-prompt" style="color:#000">${alphabet[currentIdx]}</span>`;
+        if (!document.getElementById('typing-ui').classList.contains('hidden')) {
+            setupCanvas(oCanvas, oCtx); // Ensure output is sharp too
+            renderHandwriting(document.getElementById('textInput').value);
+        }
     }
 
     document.getElementById('textInput').addEventListener('input', (e) => renderHandwriting(e.target.value));
@@ -146,37 +163,40 @@
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
         let curX = 30;
-        let curY = 80;
-        const scale = 0.3;
+        let curY = 60;
+        const scale = 0.35;
 
         for (let char of text) {
-            if (char === ' ') { curX += 40; continue; }
-            if (char === '\n') { curX = 30; curY += 120; continue; }
+            if (char === ' ') { curX += 45; continue; }
+            if (char === '\n') { curX = 30; curY += 100; continue; }
 
             const variants = modelData[char];
             if (variants && variants.length > 0) {
                 const variant = variants[Math.floor(Math.random() * variants.length)];
                 
-                oCtx.beginPath();
-                oCtx.lineWidth = 2.5;
+                oCtx.lineWidth = 2.2;
                 oCtx.strokeStyle = '#000';
-                
-                variant.points.forEach((pt, i) => {
-                    const jX = (Math.random() - 0.5) * 1.2;
-                    const jY = (Math.random() - 0.5) * 1.2;
-                    const dx = curX + (pt.x * scale) + jX;
-                    const dy = curY + (pt.y * scale) + jY;
-                    if (i === 0) oCtx.moveTo(dx, dy);
-                    else oCtx.lineTo(dx, dy);
-                });
-                oCtx.stroke();
-                // Move cursor based on the ACTUAL width of the letter drawn
-                curX += (variant.width * scale) + 15; 
-            } else {
-                curX += 40; // Default spacing for unknown chars
-            }
+                oCtx.lineCap = 'round';
+                oCtx.lineJoin = 'round';
 
-            if (curX > oCanvas.width - 80) { curX = 30; curY += 120; }
+                variant.strokes.forEach(stroke => {
+                    oCtx.beginPath();
+                    stroke.forEach((pt, i) => {
+                        const jX = (Math.random() - 0.5) * 1.2;
+                        const jY = (Math.random() - 0.5) * 1.2;
+                        const dx = curX + (pt.x * scale) + jX;
+                        const dy = curY + (pt.y * scale) + jY;
+                        if (i === 0) oCtx.moveTo(dx, dy);
+                        else oCtx.lineTo(dx, dy);
+                    });
+                    oCtx.stroke();
+                });
+                curX += (variant.width * scale) + 18; 
+            } else { curX += 45; }
+
+            if (curX > (oCanvas.width / (window.devicePixelRatio || 1)) - 80) { 
+                curX = 30; curY += 100; 
+            }
         }
     }
 
@@ -184,7 +204,7 @@
         const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'});
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
-        a.download = 'handwriting_v2.json';
+        a.download = 'multi_stroke_model.json';
         a.click();
     }
 
