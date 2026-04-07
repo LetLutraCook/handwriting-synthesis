@@ -1,2 +1,2 @@
 # handwriting-synthesis
-Synthesize handwriting via images
+Synthesize handwriting
