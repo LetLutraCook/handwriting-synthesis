@@ -2,24 +2,36 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>handwriting-synthesis</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Handwriting Trainer</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
-        #controls { margin-bottom: 20px; }
-        textarea { width: 100%; height: 100px; padding: 10px; font-size: 16px; }
-        canvas { background: white; border: 1px solid #ccc; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { font-family: sans-serif; touch-action: none; overflow: hidden; background: #f4f4f9; display: flex; flex-direction: column; height: 100vh; margin: 0; }
+        #train-zone { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        canvas { background: white; border: 2px solid #333; cursor: crosshair; touch-action: none; box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        #controls { padding: 20px; background: white; border-top: 1px solid #ddd; }
+        button { padding: 10px 20px; font-weight: bold; cursor: pointer; margin-right: 10px; }
+        textarea { width: 100%; margin-top: 10px; height: 60px; }
     </style>
 </head>
 <body>
 
-    <div id="controls">
-        <h1>Handwriting Generator</h1>
-        <textarea id="textInput" placeholder="Start typing your handwritten message..."></textarea>
+<div id="train-zone">
+    <h2 id="prompt">Draw: A</h2>
+    <canvas id="drawCanvas" width="300" height="300"></canvas>
+    <div style="margin-top:10px;">
+        <button onclick="clearCanvas()">Clear</button>
+        <button onclick="saveLetter()" style="background: #4CAF50; color: white;">Save & Next</button>
     </div>
+</div>
 
-    <canvas id="writingCanvas" width="800" height="400"></canvas>
+<div id="controls">
+    <button onclick="downloadModel()">Download Model (.json)</button>
+    <input type="file" id="uploadModel" style="display:none" onchange="loadModel(event)">
+    <button onclick="document.getElementById('uploadModel').click()">Upload Model</button>
+    <textarea id="testInput" placeholder="Type here to see your AI handwriting..."></textarea>
+    <canvas id="outputCanvas" width="800" height="200" style="width:100%; height:auto; margin-top:10px;"></canvas>
+</div>
 
-    <script src="script.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
