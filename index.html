@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v14</title>
+    <title>Lutra Handwriting AI v15</title>
     <style>
         :root { 
-            --primary: #6366f1; --primary-hover: #4f46e5; --bg: #f1f5f9; 
-            --panel: #ffffff; --text: #0f172a; --text-light: #64748b; --border: #e2e8f0;
+            --primary: #6366f1; --bg: #f1f5f9; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         body { 
@@ -21,30 +20,32 @@
         }
         #char-prompt { background: #e0e7ff; color: var(--primary); padding: 4px 12px; border-radius: 6px; font-weight: 700; }
         .main-container { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.5rem; gap: 1.5rem; overflow-y: auto; padding-bottom: 120px; }
+        
+        /* Canvas Isolation */
+        canvas { 
+            user-select: none; 
+            -webkit-user-select: none; 
+            touch-action: none; 
+            -webkit-touch-callout: none;
+        }
+
         .card { 
             background: var(--panel); padding: 2rem; border-radius: 24px; 
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 100%; max-width: 480px; border: 1px solid var(--border);
         }
-        canvas#drawCanvas { 
-            background: #fafafa; border: 2px solid var(--border); border-radius: 16px; 
-            touch-action: none; display: block; margin: 0 auto; width: 100%; height: auto;
-        }
+        canvas#drawCanvas { background: #fafafa; border: 2px solid var(--border); border-radius: 16px; display: block; margin: 0 auto; }
+        
         .type-area { width: 100%; max-width: 1000px; display: flex; flex-direction: column; gap: 1rem; }
         .settings-bar { 
             display: flex; gap: 1rem; flex-wrap: wrap; background: #fff; padding: 1rem; 
             border-radius: 12px; border: 1px solid var(--border); font-size: 0.85rem;
         }
-        .settings-bar label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-weight: 600; }
         textarea { width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 1rem; min-height: 80px; outline: none; }
         #outputCanvas { background: transparent; border-radius: 16px; border: 1px solid var(--border); width: 100%; }
-        .btn-group { display: flex; gap: 0.75rem; margin-top: 1rem; justify-content: center; }
+        
         button { padding: 0.7rem 1.25rem; border-radius: 12px; border: 1px solid var(--border); background: white; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .btn-filled { background: var(--primary); color: white; border: none; }
-        footer { 
-            position: fixed; bottom: 0; left: 0; right: 0; padding: 1.25rem; 
-            background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px);
-            border-top: 1px solid var(--border); display: flex; gap: 12px; justify-content: center; z-index: 1000;
-        }
+        footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 1.25rem; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border-top: 1px solid var(--border); display: flex; gap: 12px; justify-content: center; }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -58,7 +59,7 @@
 <div class="main-container">
     <div id="training-ui" class="card">
         <canvas id="drawCanvas" width="400" height="400"></canvas>
-        <div class="btn-group">
+        <div class="btn-group" style="display:flex; gap:10px; margin-top:15px; justify-content:center;">
             <button onclick="clearCanvas()">Clear</button>
             <button onclick="undoStroke()">Undo</button>
             <button class="btn-filled" onclick="saveCurrentLetter()">Save & Next</button>
@@ -67,13 +68,12 @@
 
     <div id="typing-ui" class="type-area hidden">
         <div class="settings-bar">
-            <label><input type="checkbox" id="set-jitter" onchange="renderHandwriting(textInput.value)" checked> Jitter</label>
-            <label><input type="checkbox" id="set-rotation" onchange="renderHandwriting(textInput.value)" checked> Rotation</label>
-            <label><input type="checkbox" id="set-flow" onchange="renderHandwriting(textInput.value)" checked> Ink Flow</label>
-            <label><input type="checkbox" id="set-kerning" onchange="renderHandwriting(textInput.value)" checked> Kerning</label>
+            <label><input type="checkbox" id="set-jitter" onchange="renderHandwriting(textInput.value)" checked> Realistic Drift</label>
+            <label><input type="checkbox" id="set-flow" onchange="renderHandwriting(textInput.value)" checked> Ink Pressure</label>
+            <label><input type="checkbox" id="set-kern" onchange="renderHandwriting(textInput.value)" checked> Human Spacing</label>
         </div>
-        <textarea id="textInput" placeholder="Write something..." oninput="renderHandwriting(this.value)"></textarea>
-        <canvas id="outputCanvas" width="1200" height="800"></canvas>
+        <textarea id="textInput" placeholder="Type here..." oninput="renderHandwriting(this.value)"></textarea>
+        <canvas id="outputCanvas" width="1200" height="1000"></canvas>
     </div>
 </div>
 
@@ -86,143 +86,92 @@
 
 <script>
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?! ";
-    const GUIDE_LINE_Y = 300; 
-    let currentIdx = 0;
-    let modelData = {}; 
-    let letterStrokes = [];
-    let isDrawing = false;
-    let currentPath = [];
-
-    const dCanvas = document.getElementById('drawCanvas');
-    const dCtx = dCanvas.getContext('2d');
-    const oCanvas = document.getElementById('outputCanvas');
-    const oCtx = oCanvas.getContext('2d');
+    let currentIdx = 0, modelData = {}, letterStrokes = [], isDrawing = false, currentPath = [];
+    const dCanvas = document.getElementById('drawCanvas'), dCtx = dCanvas.getContext('2d');
+    const oCanvas = document.getElementById('outputCanvas'), oCtx = oCanvas.getContext('2d');
     const textInput = document.getElementById('textInput');
 
-    drawGuideLine();
-
-    // Unified Position Logic
     function getPos(e) {
         const rect = dCanvas.getBoundingClientRect();
-        // Uses clientX/Y which works for both PointerEvents and Touch
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        return { 
-            x: x * (dCanvas.width / rect.width), 
-            y: y * (dCanvas.height / rect.height), 
-            t: Date.now() 
-        };
+        return { x: (e.clientX - rect.left) * (dCanvas.width / rect.width), y: (e.clientY - rect.top) * (dCanvas.height / rect.height), t: Date.now() };
     }
 
-    // Pointer Events (Handles Mouse + Touch + Pen)
     dCanvas.addEventListener('pointerdown', (e) => {
-        dCanvas.setPointerCapture(e.pointerId);
-        isDrawing = true;
-        const p = getPos(e);
-        dCtx.beginPath();
-        dCtx.moveTo(p.x, p.y);
-        currentPath = [p];
+        e.preventDefault(); dCanvas.setPointerCapture(e.pointerId);
+        isDrawing = true; const p = getPos(e); dCtx.beginPath(); dCtx.moveTo(p.x, p.y); currentPath = [p];
     });
 
     dCanvas.addEventListener('pointermove', (e) => {
-        if (!isDrawing) return;
-        const p = getPos(e);
-        const last = currentPath[currentPath.length-1];
-        const dist = Math.hypot(p.x - last.x, p.y - last.y);
-        const speed = dist / Math.max(1, p.t - last.t);
-        
-        dCtx.lineWidth = Math.max(2, 5 - speed * 1.2);
-        dCtx.lineCap = 'round';
-        dCtx.strokeStyle = '#1e293b';
-        dCtx.lineTo(p.x, p.y);
-        dCtx.stroke();
-        currentPath.push(p);
+        if (!isDrawing) return; e.preventDefault();
+        const p = getPos(e); const last = currentPath[currentPath.length-1];
+        const speed = Math.hypot(p.x - last.x, p.y - last.y) / Math.max(1, p.t - last.t);
+        dCtx.lineWidth = Math.max(2, 5 - speed * 1.2); dCtx.lineCap = 'round'; dCtx.strokeStyle = '#1e293b';
+        dCtx.lineTo(p.x, p.y); dCtx.stroke(); currentPath.push(p);
     });
 
-    dCanvas.addEventListener('pointerup', (e) => {
-        if (isDrawing) {
-            letterStrokes.push([...currentPath]);
-            isDrawing = false;
-        }
-        dCanvas.releasePointerCapture(e.pointerId);
-    });
-
-    function drawGuideLine() {
-        dCtx.save(); dCtx.setLineDash([6, 10]); dCtx.strokeStyle = '#cbd5e1'; dCtx.lineWidth = 2;
-        dCtx.beginPath(); dCtx.moveTo(0, GUIDE_LINE_Y); dCtx.lineTo(dCanvas.width, GUIDE_LINE_Y); dCtx.stroke();
-        dCtx.restore();
-    }
-
-    function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); drawGuideLine(); letterStrokes = []; }
-    function undoStroke() { letterStrokes.pop(); redrawTraining(); }
-    function redrawTraining() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); drawGuideLine(); dCtx.strokeStyle = '#1e293b'; dCtx.lineWidth = 3; letterStrokes.forEach(s => { dCtx.beginPath(); s.forEach((p, i) => i === 0 ? dCtx.moveTo(p.x, p.y) : dCtx.lineTo(p.x, p.y)); dCtx.stroke(); }); }
-
-    function saveCurrentLetter() {
-        if (letterStrokes.length === 0) return;
-        const all = letterStrokes.flat();
-        const minX = Math.min(...all.map(p => p.x)), maxX = Math.max(...all.map(p => p.x));
-        const minY = Math.min(...all.map(p => p.y)), maxY = Math.max(...all.map(p => p.y));
-        modelData[alphabet[currentIdx]] = {
-            strokes: letterStrokes.map(s => s.map(p => ({ x: p.x - minX, y: p.y - minY }))),
-            width: maxX - minX, height: maxY - minY, relativeBaseline: minY - GUIDE_LINE_Y 
-        };
-        currentIdx++; if (currentIdx < alphabet.length) document.getElementById('char-prompt').innerText = alphabet[currentIdx];
-        clearCanvas();
-    }
-
-    function toggleMode() {
-        const isT = !document.getElementById('training-ui').classList.contains('hidden');
-        document.getElementById('training-ui').classList.toggle('hidden');
-        document.getElementById('typing-ui').classList.toggle('hidden');
-        document.getElementById('mode-text').innerText = isT ? "Typing" : "Training";
-        if (isT) renderHandwriting(textInput.value);
-    }
+    dCanvas.addEventListener('pointerup', (e) => { if (isDrawing) { letterStrokes.push([...currentPath]); isDrawing = false; } });
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
-        let curX = 60, curY = 160; const scale = 0.4;
+        let curX = 60, curY = 160; const scale = 0.45;
         const useJitter = document.getElementById('set-jitter').checked;
-        const useRot = document.getElementById('set-rotation').checked;
         const useFlow = document.getElementById('set-flow').checked;
-        const useKern = document.getElementById('set-kerning').checked;
+        const useKern = document.getElementById('set-kern').checked;
 
-        for (let char of text) {
-            if (char === ' ') { curX += 45 + (useKern ? Math.random()*15 : 0); continue; }
-            if (char === '\n') { curX = 60; curY += 160; continue; }
-            const variant = modelData[char];
-            if (variant) {
-                oCtx.save();
-                const driftY = useJitter ? (Math.random() - 0.5) * 6 : 0;
-                const rot = useRot ? (Math.random() - 0.5) * 0.04 : 0;
-                oCtx.translate(curX, curY + (variant.relativeBaseline * scale) + driftY);
-                oCtx.rotate(rot);
-                oCtx.strokeStyle = '#0f172a'; oCtx.lineCap = 'round'; oCtx.lineJoin = 'round';
-                
-                variant.strokes.forEach(s => {
-                    oCtx.beginPath();
-                    s.forEach((p, i) => {
-                        if (useFlow) oCtx.lineWidth = 1.8 + (Math.sin(i * 0.5) * 0.4);
-                        else oCtx.lineWidth = 2.2;
-                        if (i === 0) oCtx.moveTo(p.x * scale, p.y * scale);
-                        else { oCtx.lineTo(p.x * scale, p.y * scale); oCtx.stroke(); oCtx.beginPath(); oCtx.moveTo(p.x * scale, p.y * scale); }
+        const words = text.split(/(\s+)/);
+        
+        words.forEach(word => {
+            if (word.trim() === '') { // Handling spaces
+                curX += (40 * scale * 10) + (useKern ? Math.random() * 15 : 0);
+                return;
+            }
+
+            // Word Wrap Logic: Calculate word width first
+            let wordWidth = 0;
+            for (let char of word) {
+                const v = modelData[char];
+                wordWidth += v ? (v.width * scale * 0.9) + 10 : 20;
+            }
+
+            if (curX + wordWidth > oCanvas.width - 60) {
+                curX = 60; curY += 180;
+            }
+
+            for (let char of word) {
+                const variant = modelData[char];
+                if (variant) {
+                    oCtx.save();
+                    // Advanced Jitter: Fluid drift
+                    const driftY = useJitter ? (Math.sin(curX * 0.05) * 3) + (Math.random() * 2) : 0;
+                    const rot = useJitter ? (Math.sin(curX * 0.02) * 0.03) : 0;
+                    
+                    oCtx.translate(curX, curY + (variant.relativeBaseline * scale) + driftY);
+                    oCtx.rotate(rot);
+                    oCtx.strokeStyle = '#0f172a'; oCtx.lineCap = 'round'; oCtx.lineJoin = 'round';
+
+                    variant.strokes.forEach(s => {
+                        oCtx.beginPath();
+                        s.forEach((p, i) => {
+                            oCtx.lineWidth = useFlow ? (2.0 + Math.sin(i * 0.3) * 0.5) : 2.5;
+                            if (i === 0) oCtx.moveTo(p.x * scale, p.y * scale);
+                            else { oCtx.lineTo(p.x * scale, p.y * scale); oCtx.stroke(); oCtx.beginPath(); oCtx.moveTo(p.x * scale, p.y * scale); }
+                        });
                     });
-                });
-                oCtx.restore();
-                curX += (variant.width * scale * 0.88) + (useKern ? Math.random()*8 : 8); 
-            } else { curX += 20; }
-            if (curX > oCanvas.width - 140) { curX = 60; curY += 160; }
-        }
+                    oCtx.restore();
+                    curX += (variant.width * scale * 0.88) + (useKern ? Math.random() * 6 : 8);
+                } else { curX += 20; }
+            }
+        });
     }
 
-    function exportPNG() {
-        const link = document.createElement('a');
-        link.download = 'handwriting_export.png';
-        link.href = oCanvas.toDataURL("image/png");
-        link.click();
-    }
-
-    function downloadModel() { const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_model.json'; a.click(); }
-    function loadModel(e) { const f = e.target.files[0]; if (!f) return; const r = new FileReader(); r.onload = (ev) => { try { modelData = JSON.parse(ev.target.result); renderHandwriting(textInput.value); } catch(e) { alert("Fail"); } }; r.readAsText(f); }
+    // Standard UI helpers
+    function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); letterStrokes = []; }
+    function undoStroke() { letterStrokes.pop(); dCtx.clearRect(0,0,400,400); letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
+    function toggleMode() { document.getElementById('training-ui').classList.toggle('hidden'); document.getElementById('typing-ui').classList.toggle('hidden'); if(!document.getElementById('typing-ui').classList.contains('hidden')) renderHandwriting(textInput.value); }
+    function saveCurrentLetter() { if(letterStrokes.length===0)return; const all=letterStrokes.flat(); const minX=Math.min(...all.map(p=>p.x)), maxX=Math.max(...all.map(p=>p.x)), minY=Math.min(...all.map(p=>p.y)); modelData[alphabet[currentIdx]]={ strokes: letterStrokes.map(s=>s.map(p=>({x:p.x-minX,y:p.y-minY}))), width: maxX-minX, relativeBaseline: minY-300 }; currentIdx++; if(currentIdx<alphabet.length) document.getElementById('char-prompt').innerText=alphabet[currentIdx]; clearCanvas(); }
+    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='model.json'; a.click(); }
+    function loadModel(e) { const f=e.target.files[0]; const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); renderHandwriting(textInput.value);}; r.readAsText(f); }
+    function exportPNG() { const l=document.createElement('a'); l.download='handwriting.png'; l.href=oCanvas.toDataURL(); l.click(); }
 </script>
 </body>
 </html>
