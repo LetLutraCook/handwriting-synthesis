@@ -3,24 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v10</title>
+    <title>Lutra Handwriting AI v11</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #1e293b; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); margin: 0; color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
-        header { background: var(--panel); padding: 1rem 1.5rem; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        body { 
+            font-family: 'Inter', system-ui, sans-serif; 
+            background: var(--bg); 
+            margin: 0; 
+            color: var(--text); 
+            height: 100vh; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+        header { 
+            background: var(--panel); 
+            padding: 1rem 1.5rem; 
+            border-bottom: 1px solid #e2e8f0; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            flex-shrink: 0;
+        }
         .mode-indicator { font-weight: 800; font-size: 0.9rem; }
         #char-prompt { background: #fee2e2; color: #ef4444; padding: 2px 8px; border-radius: 4px; }
-        .main-container { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.5rem; gap: 1.5rem; }
-        .draw-card { background: var(--panel); padding: 1.5rem; border-radius: 20px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
-        canvas#drawCanvas { background: #fcfcfc; border: 2px dashed #cbd5e1; border-radius: 12px; touch-action: none; cursor: crosshair; display: block; margin: 0 auto; }
+        
+        .main-container { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 1rem; 
+            gap: 1rem; 
+            overflow-y: auto;
+            padding-bottom: 100px; /* Space for fixed footer */
+        }
+        
+        .draw-card { 
+            background: var(--panel); 
+            padding: 1.5rem; 
+            border-radius: 20px; 
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); 
+            width: 100%; 
+            max-width: 440px; 
+            text-align: center; 
+        }
+        
+        /* Canvas stays inside the card box */
+        canvas#drawCanvas { 
+            background: #fcfcfc; 
+            border: 2px dashed #cbd5e1; 
+            border-radius: 12px; 
+            touch-action: none; 
+            cursor: crosshair; 
+            display: block; 
+            margin: 0 auto;
+            max-width: 100%;
+            height: auto;
+        }
+        
         .type-area { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 1rem; }
-        textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; font-size: 1rem; min-height: 100px; outline: none; }
+        textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; font-size: 1rem; min-height: 80px; outline: none; }
         #outputCanvas { background: white; border-radius: 12px; border: 1px solid #e2e8f0; width: 100%; height: auto; }
+        
         .btn-group { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: center; flex-wrap: wrap; }
-        button { padding: 0.7rem 1.2rem; border-radius: 10px; border: 1px solid #e2e8f0; background: white; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        button { padding: 0.6rem 1rem; border-radius: 10px; border: 1px solid #e2e8f0; background: white; font-weight: 600; cursor: pointer; transition: all 0.2s; }
         .btn-filled { background: var(--primary); color: white; border: none; }
-        footer { padding: 2rem; background: #fff; border-top: 1px solid #e2e8f0; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: auto; }
+        
+        /* Fixed footer pinned to bottom of screen */
+        footer { 
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 1.5rem; 
+            background: rgba(255, 255, 255, 0.9); 
+            backdrop-filter: blur(10px);
+            border-top: 1px solid #e2e8f0; 
+            display: flex; 
+            gap: 12px; 
+            justify-content: center; 
+            z-index: 1000;
+        }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -33,7 +98,7 @@
 
 <div class="main-container">
     <div id="training-ui" class="draw-card">
-        <div style="margin-bottom: 10px; font-size: 0.8rem; color: #64748b;">Draw on the dotted line (leave room for tails)</div>
+        <div style="margin-bottom: 10px; font-size: 0.8rem; color: #64748b;">Draw on the dotted baseline (leave room for tails)</div>
         <canvas id="drawCanvas" width="400" height="400"></canvas>
         <div class="btn-group">
             <button onclick="clearCanvas()">Clear</button>
@@ -56,7 +121,7 @@
 
 <script>
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?! ";
-    const GUIDE_LINE_Y = 300; // 75% of canvas height (400)
+    const GUIDE_LINE_Y = 300; 
     let currentIdx = 0;
     let modelData = {}; 
     let isDrawing = false;
@@ -68,13 +133,14 @@
     const oCanvas = document.getElementById('outputCanvas');
     const oCtx = oCanvas.getContext('2d');
 
-    // Initialize Training Canvas with Guide Line
     drawGuideLine();
 
+    // Fix: Redraw guide line without stacking transparency
     function drawGuideLine() {
         dCtx.save();
-        dCtx.setLineDash([5, 5]);
+        dCtx.setLineDash([5, 8]);
         dCtx.strokeStyle = '#cbd5e1';
+        dCtx.lineWidth = 2;
         dCtx.beginPath();
         dCtx.moveTo(0, GUIDE_LINE_Y);
         dCtx.lineTo(dCanvas.width, GUIDE_LINE_Y);
@@ -86,7 +152,14 @@
         const rect = dCanvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top, t: Date.now() };
+        // Adjust for CSS scaling
+        const scaleX = dCanvas.width / rect.width;
+        const scaleY = dCanvas.height / rect.height;
+        return { 
+            x: (clientX - rect.left) * scaleX, 
+            y: (clientY - rect.top) * scaleY, 
+            t: Date.now() 
+        };
     }
 
     function start(e) {
@@ -132,6 +205,8 @@
     function redrawTrainingCanvas() {
         dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height);
         drawGuideLine();
+        dCtx.strokeStyle = '#1e293b';
+        dCtx.lineWidth = 3;
         letterStrokes.forEach(stroke => {
             dCtx.beginPath();
             stroke.forEach((p, i) => { if (i === 0) dCtx.moveTo(p.x, p.y); else dCtx.lineTo(p.x, p.y); });
@@ -151,11 +226,14 @@
             strokes: letterStrokes.map(s => s.map(p => ({ x: p.x - minX, y: p.y - minY }))),
             width: maxX - minX,
             height: maxY - minY,
-            // Vertical offset relative to the dotted line
             relativeBaseline: minY - GUIDE_LINE_Y 
         };
         currentIdx++;
-        if (currentIdx < alphabet.length) document.getElementById('char-prompt').innerText = alphabet[currentIdx];
+        if (currentIdx < alphabet.length) {
+            document.getElementById('char-prompt').innerText = alphabet[currentIdx];
+        } else {
+            document.getElementById('char-prompt').innerText = "DONE";
+        }
         clearCanvas();
     }
 
@@ -193,13 +271,9 @@
             const variant = modelData[char];
             if (variant) {
                 oCtx.lineWidth = 2.0; oCtx.strokeStyle = '#000';
-                
-                // --- LINE-BASED VERTICAL ALIGNMENT ---
-                // relativeBaseline is the distance from the guide line to the top of the letter
                 const yOffset = (variant.relativeBaseline || 0) * scale;
-                
                 variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY + yOffset, scale));
-                curX += (variant.width * scale * 0.85) + 4; 
+                curX += (variant.width * scale * 0.85) + 10; 
             } else {
                 curX += 20;
             }
@@ -209,7 +283,7 @@
 
     function downloadModel() {
         const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v10.json'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v11.json'; a.click();
     }
 
     function loadModel(e) {
