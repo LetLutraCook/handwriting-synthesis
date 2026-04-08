@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>handwriting-synthesis-v23</title>
+    <title>handwriting-synthesis-v23.4</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -19,7 +19,6 @@
         canvas#drawCanvas { background: #fdfdfd; border: 2px solid var(--border); border-radius: 16px; display: block; margin: 0 auto; cursor: crosshair; touch-action: none; }
         .type-area { width: 100%; max-width: 1100px; display: flex; flex-direction: column; gap: 1rem; }
         .wiki-section { max-width: 800px; line-height: 1.6; color: #475569; padding-bottom: 40px; }
-        .wiki-section h2 { color: var(--text); margin-top: 2rem; }
         textarea { width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 1rem; min-height: 100px; outline: none; user-select: text !important; -webkit-user-select: text !important; }
         #outputCanvas { border-radius: 16px; border: 1px solid var(--border); width: 100%; background: #fff; pointer-events: none; }
         .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; background: #fff; padding: 15px; border-radius: 16px; border: 1px solid var(--border); margin-top: 10px; }
@@ -45,7 +44,7 @@
     <div id="training-ui" class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="font-size:0.85rem; color:#64748b;">Draw on the baseline</span>
-            <label style="font-size:0.8rem; font-weight:600;"><input type="checkbox" id="set-trail" checked> Letter Trail</label>
+            <label style="font-size:0.8rem; font-weight:600;"><input type="checkbox" id="set-trail" checked onchange="drawGuide()"> Letter Trail</label>
         </div>
         <canvas id="drawCanvas" width="400" height="400"></canvas>
         <div id="model-stats" class="stats">0 characters, 0 total variants</div>
@@ -59,32 +58,23 @@
 
     <div id="typing-ui" class="type-area hidden">
         <textarea id="textInput" placeholder="Enter your text here..." oninput="renderHandwriting(this.value)"></textarea>
-        
         <div class="settings-grid">
             <div class="setting-item">Word Spacing <input type="range" id="word-space" min="20" max="150" value="80" oninput="renderHandwriting(textInput.value)"></div>
             <div class="setting-item">Letter Spacing <input type="range" id="char-space" min="0" max="50" value="10" oninput="renderHandwriting(textInput.value)"></div>
             <div class="setting-item">Line Height <input type="range" id="line-height" min="100" max="500" value="300" oninput="renderHandwriting(textInput.value)"></div>
             <div class="setting-item">Thickness <input type="range" id="thickness" min="1" max="10" value="4.5" step="0.5" oninput="renderHandwriting(textInput.value)"></div>
         </div>
-
         <canvas id="outputCanvas" width="2400" height="1200"></canvas>
     </div>
 
     <div id="wiki-ui" class="wiki-section hidden">
         <h2>Project Wiki: Handwriting with MATH</h2>
         <p><strong>Why this exists:</strong> Because I'm too lazy to write out my work on paper.</p>
-        
         <h3>The Logic</h3>
         <ul>
             <li><strong>Coordinate Mapping:</strong> Every stroke is a collection of high-precision (x, y) vectors. This isn't a font, but rather it's a simulation of motion.</li>
-            <li><strong>The Variant Lottery:</strong> Having 130+ variants means the chance of two identical letters appearing in the same paragraph is less than if you had only one variant per character.</li>
-            <li><strong>The Recursive Loop:</strong> The more you train, the more "Letter Trail" ghosts you create, allowing the model to understand the boundaries of your style without being rigid.</li>
-        </ul>
-
-        <h3>Practical Laziness Tips</h3>
-        <ul>
-            <li>Use <strong>High-Res PNG Export</strong> to drop the final output directly into digital assignments.</li>
-            <li>Adjust <strong>Word Spacing</strong> to match your handwriting.</li>
+            <li><strong>The Variant Lottery:</strong> Having 130+ variants means the chance of two identical letters appearing in the same paragraph is minimized.</li>
+            <li><strong>The Recursive Loop:</strong> The more you train, the more "Letter Trail" ghosts you create, showing your last 3 saved characters for spacing reference.</li>
         </ul>
         <button onclick="hideWiki()" style="margin-top:20px;">Back to App</button>
     </div>
@@ -93,7 +83,7 @@
 <footer>
     <button onclick="downloadModel()">Save Model</button>
     <button onclick="document.getElementById('fileInput').click()">Load Model</button>
-    <button class="btn-filled" onclick="exportPNG()">Export PNG</button>
+    <button class="btn-filled" onclick="exportPNG()">Export High-Res PNG</button>
     <input type="file" id="fileInput" class="hidden" onchange="loadModel(event)">
 </footer>
 
@@ -101,32 +91,33 @@
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?! ";
     const BASELINE_Y = 300;
     let currentIdx = 0, modelData = {}, letterStrokes = [], isDrawing = false, currentPath = [];
-    let lastActiveMode = 'training'; 
+    let lastActiveMode = 'training', lastThreeSaved = []; 
     
     const dCanvas = document.getElementById('drawCanvas'), dCtx = dCanvas.getContext('2d');
     const oCanvas = document.getElementById('outputCanvas'), oCtx = oCanvas.getContext('2d');
     const textInput = document.getElementById('textInput');
 
     function drawGuide() {
+        dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height);
         dCtx.save();
         dCtx.setLineDash([6, 10]); dCtx.strokeStyle = '#e2e8f0'; dCtx.lineWidth = 2;
         dCtx.beginPath(); dCtx.moveTo(0, BASELINE_Y); dCtx.lineTo(dCanvas.width, BASELINE_Y); dCtx.stroke();
         
-        if (document.getElementById('set-trail').checked) {
-            const char = alphabet[currentIdx];
-            if (modelData[char]) {
-                dCtx.globalAlpha = 0.1; dCtx.strokeStyle = '#6366f1';
-                modelData[char].forEach(variant => {
-                    variant.strokes.forEach(stroke => {
-                        dCtx.beginPath();
-                        stroke.forEach((p, i) => {
-                            if (i === 0) dCtx.moveTo(p.x + 50, p.y + BASELINE_Y + variant.relativeBaseline);
-                            else dCtx.lineTo(p.x + 50, p.y + BASELINE_Y + variant.relativeBaseline);
-                        });
-                        dCtx.stroke();
+        if (document.getElementById('set-trail').checked && lastThreeSaved.length > 0) {
+            dCtx.globalAlpha = 0.15; dCtx.strokeStyle = '#6366f1';
+            let trailX = 20; 
+            lastThreeSaved.forEach(item => {
+                const v = item.variant;
+                v.strokes.forEach(stroke => {
+                    dCtx.beginPath();
+                    stroke.forEach((p, i) => {
+                        if (i === 0) dCtx.moveTo(p.x + trailX, p.y + BASELINE_Y + v.relativeBaseline);
+                        else dCtx.lineTo(p.x + trailX, p.y + BASELINE_Y + v.relativeBaseline);
                     });
+                    dCtx.stroke();
                 });
-            }
+                trailX += (v.width * 0.5) + 25; 
+            });
         }
         dCtx.restore();
     }
@@ -153,31 +144,24 @@
     dCanvas.addEventListener('touchstart', startDraw, {passive: false}); dCanvas.addEventListener('touchmove', moveDraw, {passive: false}); dCanvas.addEventListener('touchend', endDraw, {passive: false});
 
     function saveCurrentLetter() { 
-        if(letterStrokes.length===0)return; 
+        if(letterStrokes.length===0) return; 
         const all=letterStrokes.flat(), minX=Math.min(...all.map(p=>p.x)), maxX=Math.max(...all.map(p=>p.x)), minY=Math.min(...all.map(p=>p.y)); 
         const char = alphabet[currentIdx];
+        const newVariant = { strokes: letterStrokes.map(s=>s.map(p=>({x:p.x-minX,y:p.y-minY}))), width: maxX-minX, relativeBaseline: minY-BASELINE_Y };
         if (!modelData[char]) modelData[char] = [];
-        modelData[char].push({ strokes: letterStrokes.map(s=>s.map(p=>({x:p.x-minX,y:p.y-minY}))), width: maxX-minX, relativeBaseline: minY-BASELINE_Y }); 
+        modelData[char].push(newVariant); 
+        lastThreeSaved.push({ char, variant: newVariant });
+        if (lastThreeSaved.length > 3) lastThreeSaved.shift();
         currentIdx = (currentIdx + 1) % alphabet.length;
         document.getElementById('char-prompt').innerText = alphabet[currentIdx];
         updateStats(); clearCanvas(); 
     }
 
-    function resetIndex() { currentIdx = 0; document.getElementById('char-prompt').innerText = alphabet[currentIdx]; clearCanvas(); }
-    function updateStats() { 
-        let total = 0; Object.values(modelData).forEach(v => total += v.length);
-        document.getElementById('model-stats').innerText = `${Object.keys(modelData).length} characters, ${total} variants`; 
-    }
-
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
-        const wSpace = parseInt(document.getElementById('word-space').value);
-        const cSpace = parseInt(document.getElementById('char-space').value);
-        const lHeight = parseInt(document.getElementById('line-height').value);
-        const thickness = parseFloat(document.getElementById('thickness').value);
-        
+        const wSpace = parseInt(document.getElementById('word-space').value), cSpace = parseInt(document.getElementById('char-space').value);
+        const lHeight = parseInt(document.getElementById('line-height').value), thickness = parseFloat(document.getElementById('thickness').value);
         let curX = 100, curY = lHeight; const scale = 0.85; 
-        
         text.split('\n').forEach(line => {
             curX = 100;
             line.split(/(\s+)/).forEach(word => {
@@ -186,16 +170,13 @@
                     const variants = modelData[char];
                     if (variants) {
                         const v = variants[Math.floor(Math.random() * variants.length)];
-                        oCtx.save();
-                        oCtx.translate(curX, curY + (v.relativeBaseline * scale));
+                        oCtx.save(); oCtx.translate(curX, curY + (v.relativeBaseline * scale));
                         oCtx.strokeStyle = '#1e293b'; oCtx.lineWidth = thickness; oCtx.lineCap = 'round';
                         v.strokes.forEach(s => {
-                            oCtx.beginPath();
-                            s.forEach((p, i) => i === 0 ? oCtx.moveTo(p.x * scale, p.y * scale) : oCtx.lineTo(p.x * scale, p.y * scale));
+                            oCtx.beginPath(); s.forEach((p, i) => i === 0 ? oCtx.moveTo(p.x * scale, p.y * scale) : oCtx.lineTo(p.x * scale, p.y * scale));
                             oCtx.stroke();
                         });
-                        oCtx.restore();
-                        curX += (v.width * scale) + cSpace;
+                        oCtx.restore(); curX += (v.width * scale) + cSpace;
                     } else { curX += 25; }
                 }
             });
@@ -203,38 +184,13 @@
         });
     }
 
-    function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); drawGuide(); letterStrokes = []; }
-    function undoStroke() { letterStrokes.pop(); dCtx.clearRect(0,0,400,400); drawGuide(); dCtx.strokeStyle = '#0f172a'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
-    
-    function toggleMode() { 
-        const isTrainingVisible = !document.getElementById('training-ui').classList.contains('hidden');
-        lastActiveMode = isTrainingVisible ? 'typing' : 'training';
-        document.getElementById('training-ui').classList.toggle('hidden', isTrainingVisible);
-        document.getElementById('typing-ui').classList.toggle('hidden', !isTrainingVisible);
-        document.getElementById('wiki-ui').classList.add('hidden');
-        document.getElementById('mode-label').innerText = isTrainingVisible ? "Typing" : "Training";
-        document.getElementById('char-prompt').classList.toggle('hidden', isTrainingVisible);
-        if(isTrainingVisible) renderHandwriting(textInput.value);
-    }
-
-    function showWiki() { 
-        const isTrainingVisible = !document.getElementById('training-ui').classList.contains('hidden');
-        lastActiveMode = isTrainingVisible ? 'training' : 'typing';
-        document.getElementById('wiki-ui').classList.remove('hidden'); 
-        document.getElementById('training-ui').classList.add('hidden'); 
-        document.getElementById('typing-ui').classList.add('hidden'); 
-    }
-
-    function hideWiki() { 
-        document.getElementById('wiki-ui').classList.add('hidden'); 
-        if (lastActiveMode === 'training') {
-            document.getElementById('training-ui').classList.remove('hidden');
-        } else {
-            document.getElementById('typing-ui').classList.remove('hidden');
-            renderHandwriting(textInput.value);
-        }
-    }
-
+    function clearCanvas() { letterStrokes = []; drawGuide(); }
+    function undoStroke() { letterStrokes.pop(); drawGuide(); dCtx.strokeStyle = '#0f172a'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
+    function resetIndex() { currentIdx = 0; document.getElementById('char-prompt').innerText = alphabet[currentIdx]; lastThreeSaved = []; clearCanvas(); }
+    function updateStats() { let total = 0; Object.values(modelData).forEach(v => total += v.length); document.getElementById('model-stats').innerText = `${Object.keys(modelData).length} characters, ${total} variants`; }
+    function toggleMode() { const isT = !document.getElementById('training-ui').classList.contains('hidden'); lastActiveMode = isT ? 'typing' : 'training'; document.getElementById('training-ui').classList.toggle('hidden', isT); document.getElementById('typing-ui').classList.toggle('hidden', !isT); document.getElementById('wiki-ui').classList.add('hidden'); document.getElementById('mode-label').innerText = isT ? "Typing" : "Training"; document.getElementById('char-prompt').classList.toggle('hidden', isT); if(isT) renderHandwriting(textInput.value); }
+    function showWiki() { const isT = !document.getElementById('training-ui').classList.contains('hidden'); lastActiveMode = isT ? 'training' : 'typing'; document.getElementById('wiki-ui').classList.remove('hidden'); document.getElementById('training-ui').classList.add('hidden'); document.getElementById('typing-ui').classList.add('hidden'); }
+    function hideWiki() { document.getElementById('wiki-ui').classList.add('hidden'); if (lastActiveMode === 'training') document.getElementById('training-ui').classList.remove('hidden'); else { document.getElementById('typing-ui').classList.remove('hidden'); renderHandwriting(textInput.value); } }
     function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_model.json'; a.click(); }
     function loadModel(e) { const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); updateStats();}; r.readAsText(e.target.files[0]); }
     function exportPNG() { const l=document.createElement('a'); l.download='handwriting.png'; l.href=oCanvas.toDataURL('image/png'); l.click(); }
