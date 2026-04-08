@@ -3,15 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v19</title>
+    <title>Lutra Handwriting AI v20</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         body { 
             font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: var(--text); 
             height: 100vh; display: flex; flex-direction: column; overflow: hidden;
-            user-select: none; -webkit-user-select: none; touch-action: none;
+            /* Global prevention */
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
         }
+
+        /* Target the specific drawing area to kill the magnifier */
+        #training-ui, #drawCanvas {
+            touch-action: none !important;
+            -webkit-user-select: none !important;
+            -webkit-touch-callout: none !important;
+            user-select: none !important;
+        }
+
         header { background: #fff; padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 100; }
         #char-prompt { background: #e0e7ff; color: var(--primary); padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; }
         .main-container { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.5rem; gap: 1rem; overflow-y: auto; padding-bottom: 120px; }
@@ -33,11 +44,11 @@
 
 <header>
     <div style="font-weight: 600;">Mode: <span id="mode-text" style="color:var(--primary)">Training</span> <span id="char-prompt">A</span></div>
-    <button class="btn-filled" onclick="toggleMode()">Switch to Type Mode</button>
+    <button class="btn-filled" onclick="toggleMode()">Switch Mode</button>
 </header>
 
 <div class="main-container">
-    <div id="training-ui" class="card" onselectstart="return false;">
+    <div id="training-ui" class="card">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="font-size:0.85rem; color:#64748b;">Draw on the baseline</span>
             <label style="font-size:0.8rem; font-weight:600;"><input type="checkbox" id="set-onion" checked> Onion Skin</label>
@@ -52,8 +63,8 @@
 
     <div id="typing-ui" class="type-area hidden">
         <div class="settings-bar">
-            <div class="slider-group">Word Spacing <input type="range" id="space-slider" min="5" max="80" value="25" oninput="renderHandwriting(textInput.value)"></div>
-            <div class="slider-group">Letter Tightness <input type="range" id="kern-slider" min="-10" max="25" value="6" oninput="renderHandwriting(textInput.value)"></div>
+            <div class="slider-group">Word Spacing <input type="range" id="space-slider" min="5" max="100" value="30" oninput="renderHandwriting(textInput.value)"></div>
+            <div class="slider-group">Letter Tightness <input type="range" id="kern-slider" min="-10" max="30" value="8" oninput="renderHandwriting(textInput.value)"></div>
             <label style="font-weight:600;"><input type="checkbox" id="set-jitter" onchange="renderHandwriting(textInput.value)" checked> Drift</label>
             <label style="font-weight:600;"><input type="checkbox" id="set-flow" onchange="renderHandwriting(textInput.value)" checked> Pressure</label>
         </div>
@@ -78,6 +89,15 @@
     const dCanvas = document.getElementById('drawCanvas'), dCtx = dCanvas.getContext('2d');
     const oCanvas = document.getElementById('outputCanvas'), oCtx = oCanvas.getContext('2d');
     const textInput = document.getElementById('textInput');
+
+    // Robust magnifier/context suppression
+    function killEvents(e) {
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
+    dCanvas.addEventListener('contextmenu', killEvents);
+    dCanvas.addEventListener('touchstart', (e) => { if(e.touches.length > 1) killEvents(e); }, {passive: false});
 
     function drawGuide() {
         dCtx.save();
@@ -106,23 +126,35 @@
 
     function getPos(e) {
         const rect = dCanvas.getBoundingClientRect();
-        return { x: (e.clientX - rect.left) * (dCanvas.width / rect.width), y: (e.clientY - rect.top) * (dCanvas.height / rect.height), t: Date.now() };
+        const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+        const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+        return { 
+            x: (clientX - rect.left) * (dCanvas.width / rect.width), 
+            y: (clientY - rect.top) * (dCanvas.height / rect.height), 
+            t: Date.now() 
+        };
     }
 
-    dCanvas.addEventListener('pointerdown', (e) => {
-        e.preventDefault(); dCanvas.setPointerCapture(e.pointerId);
+    // Using both pointer and touch events for maximum iPad compatibility
+    function startDraw(e) {
+        e.preventDefault();
         isDrawing = true; const p = getPos(e); dCtx.beginPath(); dCtx.moveTo(p.x, p.y); currentPath = [p];
-    });
-
-    dCanvas.addEventListener('pointermove', (e) => {
+    }
+    function moveDraw(e) {
         if (!isDrawing) return; e.preventDefault();
         const p = getPos(e); const last = currentPath[currentPath.length-1];
         const speed = Math.hypot(p.x - last.x, p.y - last.y) / Math.max(1, p.t - last.t);
         dCtx.lineWidth = Math.max(2.2, 5.5 - speed * 1.5); dCtx.lineCap = 'round'; dCtx.strokeStyle = '#0f172a';
         dCtx.lineTo(p.x, p.y); dCtx.stroke(); currentPath.push(p);
-    });
+    }
+    function endDraw(e) { if (isDrawing) { letterStrokes.push([...currentPath]); isDrawing = false; } }
 
-    dCanvas.addEventListener('pointerup', () => { if (isDrawing) { letterStrokes.push([...currentPath]); isDrawing = false; } });
+    dCanvas.addEventListener('pointerdown', startDraw);
+    dCanvas.addEventListener('pointermove', moveDraw);
+    dCanvas.addEventListener('pointerup', endDraw);
+    dCanvas.addEventListener('touchstart', startDraw, {passive: false});
+    dCanvas.addEventListener('touchmove', moveDraw, {passive: false});
+    dCanvas.addEventListener('touchend', endDraw, {passive: false});
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
@@ -178,7 +210,7 @@
     function toggleMode() { document.getElementById('training-ui').classList.toggle('hidden'); document.getElementById('typing-ui').classList.toggle('hidden'); document.getElementById('mode-text').innerText = document.getElementById('training-ui').classList.contains('hidden') ? "Typing" : "Training"; if(!document.getElementById('typing-ui').classList.contains('hidden')) renderHandwriting(textInput.value); }
     function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_model.json'; a.click(); }
     function loadModel(e) { const f=e.target.files[0]; const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); historyKeys = Object.keys(modelData); renderHandwriting(textInput.value);}; r.readAsText(f); }
-    function exportPNG() { const l=document.createElement('a'); l.download='handwriting_v19.png'; l.href=oCanvas.toDataURL('image/png', 1.0); l.click(); }
+    function exportPNG() { const l=document.createElement('a'); l.download='handwriting_v20.png'; l.href=oCanvas.toDataURL('image/png', 1.0); l.click(); }
 </script>
 </body>
 </html>
