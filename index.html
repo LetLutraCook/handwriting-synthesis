@@ -1,9 +1,9 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v21</title>
+    <title>Lutra Handwriting AI v22</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -43,7 +43,7 @@
             <label style="font-size:0.8rem; font-weight:600;"><input type="checkbox" id="set-trail" checked> Letter Trail</label>
         </div>
         <canvas id="drawCanvas" width="400" height="400"></canvas>
-        <div id="model-stats" class="stats">Model contains 0 characters</div>
+        <div id="model-stats" class="stats">Model initialized.</div>
         <div style="display:flex; gap:10px; margin-top:20px; justify-content:center;">
             <button onclick="clearCanvas()">Clear</button>
             <button onclick="undoStroke()">Undo</button>
@@ -122,8 +122,8 @@
     }
     function endDraw() { if (isDrawing) { letterStrokes.push([...currentPath]); isDrawing = false; } }
 
-    dCanvas.addEventListener('pointerdown', startDraw); dCanvas.addEventListener('pointermove', moveDraw); dCanvas.addEventListener('pointerup', endDraw);
     dCanvas.addEventListener('touchstart', startDraw, {passive: false}); dCanvas.addEventListener('touchmove', moveDraw, {passive: false}); dCanvas.addEventListener('touchend', endDraw, {passive: false});
+    dCanvas.addEventListener('pointerdown', startDraw); dCanvas.addEventListener('pointermove', moveDraw); dCanvas.addEventListener('pointerup', endDraw);
 
     function saveCurrentLetter() { 
         if(letterStrokes.length===0)return; 
@@ -144,7 +144,10 @@
     }
 
     function resetIndex() { currentIdx = 0; document.getElementById('char-prompt').innerText = alphabet[currentIdx]; clearCanvas(); }
-    function updateStats() { document.getElementById('model-stats').innerText = `Model contains ${Object.keys(modelData).length} unique characters.`; }
+    function updateStats() { 
+        let total = 0; Object.values(modelData).forEach(v => total += v.length);
+        document.getElementById('model-stats').innerText = `${Object.keys(modelData).length} characters mapped, ${total} total variants.`; 
+    }
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
@@ -163,7 +166,6 @@
             for (let char of word) {
                 const variants = modelData[char];
                 if (variants) {
-                    // Randomly select a variant for natural variation
                     const v = variants[Math.floor(Math.random() * variants.length)];
                     oCtx.save();
                     const dY = document.getElementById('set-jitter').checked ? (Math.sin(curX * 0.05) * 5) : 0;
@@ -188,9 +190,9 @@
     function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); drawGuide(); letterStrokes = []; }
     function undoStroke() { letterStrokes.pop(); dCtx.clearRect(0,0,400,400); drawGuide(); dCtx.strokeStyle = '#0f172a'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
     function toggleMode() { document.getElementById('training-ui').classList.toggle('hidden'); document.getElementById('typing-ui').classList.toggle('hidden'); document.getElementById('mode-text').innerText = document.getElementById('training-ui').classList.contains('hidden') ? "Typing" : "Training"; if(!document.getElementById('typing-ui').classList.contains('hidden')) renderHandwriting(textInput.value); }
-    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_v21.json'; a.click(); }
+    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_v22.json'; a.click(); }
     function loadModel(e) { const f=e.target.files[0]; const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); updateStats(); renderHandwriting(textInput.value);}; r.readAsText(f); }
-    function exportPNG() { const l=document.createElement('a'); l.download='handwriting_v21.png'; l.href=oCanvas.toDataURL('image/png', 1.0); l.click(); }
+    function exportPNG() { const l=document.createElement('a'); l.download='handwriting_v22.png'; l.href=oCanvas.toDataURL('image/png', 1.0); l.click(); }
 </script>
 </body>
 </html>
