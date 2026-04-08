@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v22</title>
+    <title>handwriting-synthesis-v23</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -12,28 +12,31 @@
             height: 100vh; display: flex; flex-direction: column; overflow: hidden;
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
         }
-        #training-ui, #drawCanvas { touch-action: none !important; -webkit-user-select: none !important; -webkit-touch-callout: none !important; }
         header { background: #fff; padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 100; }
-        #char-prompt { background: #e0e7ff; color: var(--primary); padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; }
+        #char-prompt { background: #e0e7ff; color: var(--primary); padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; margin-left: 8px; }
         .main-container { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.5rem; gap: 1rem; overflow-y: auto; padding-bottom: 120px; }
         .card { background: var(--panel); padding: 1.5rem; border-radius: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); width: 100%; max-width: 500px; border: 1px solid var(--border); }
-        canvas#drawCanvas { background: #fdfdfd; border: 2px solid var(--border); border-radius: 16px; display: block; margin: 0 auto; cursor: crosshair; }
+        canvas#drawCanvas { background: #fdfdfd; border: 2px solid var(--border); border-radius: 16px; display: block; margin: 0 auto; cursor: crosshair; touch-action: none; }
         .type-area { width: 100%; max-width: 1100px; display: flex; flex-direction: column; gap: 1rem; }
-        .settings-bar { display: flex; gap: 2rem; flex-wrap: wrap; background: #fff; padding: 1.25rem; border-radius: 16px; border: 1px solid var(--border); align-items: center; }
+        .wiki-section { max-width: 800px; line-height: 1.6; color: #475569; padding-bottom: 40px; }
+        .wiki-section h2 { color: var(--text); margin-top: 2rem; }
         textarea { width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 1rem; min-height: 100px; outline: none; user-select: text !important; -webkit-user-select: text !important; }
         #outputCanvas { border-radius: 16px; border: 1px solid var(--border); width: 100%; background: #fff; pointer-events: none; }
         button { padding: 0.7rem 1.25rem; border-radius: 12px; border: 1px solid var(--border); background: white; font-weight: 600; cursor: pointer; transition: 0.2s; }
         .btn-filled { background: var(--primary); color: white; border: none; }
-        footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 1.25rem; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(16px); border-top: 1px solid var(--border); display: flex; gap: 12px; justify-content: center; }
+        footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 1.25rem; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(16px); border-top: 1px solid var(--border); display: flex; gap: 12px; justify-content: center; z-index: 100; }
         .hidden { display: none !important; }
-        .stats { font-size: 0.7rem; color: #64748b; margin-top: 5px; text-align: center; }
+        .stats { font-size: 0.75rem; color: #64748b; margin-top: 8px; text-align: center; }
     </style>
 </head>
 <body oncontextmenu="return false;">
 
 <header>
-    <div style="font-weight: 600;">Mode: <span id="mode-text" style="color:var(--primary)">Training</span> <span id="char-prompt">A</span></div>
-    <button class="btn-filled" onclick="toggleMode()">Switch Mode</button>
+    <div style="font-weight: 600;">Mode: <span id="mode-label">Training</span><span id="char-prompt">A</span></div>
+    <div style="display:flex; gap:10px;">
+        <button onclick="showWiki()">Project Wiki</button>
+        <button class="btn-filled" onclick="toggleMode()">Switch Mode</button>
+    </div>
 </header>
 
 <div class="main-container">
@@ -43,7 +46,7 @@
             <label style="font-size:0.8rem; font-weight:600;"><input type="checkbox" id="set-trail" checked> Letter Trail</label>
         </div>
         <canvas id="drawCanvas" width="400" height="400"></canvas>
-        <div id="model-stats" class="stats">Model initialized.</div>
+        <div id="model-stats" class="stats">0 characters, 0 total variants</div>
         <div style="display:flex; gap:10px; margin-top:20px; justify-content:center;">
             <button onclick="clearCanvas()">Clear</button>
             <button onclick="undoStroke()">Undo</button>
@@ -53,21 +56,34 @@
     </div>
 
     <div id="typing-ui" class="type-area hidden">
-        <div class="settings-bar">
-            <div style="display:flex; flex-direction:column; gap:6px;">Word Spacing <input type="range" id="space-slider" min="5" max="100" value="30" oninput="renderHandwriting(textInput.value)"></div>
-            <div style="display:flex; flex-direction:column; gap:6px;">Letter Tightness <input type="range" id="kern-slider" min="-10" max="30" value="8" oninput="renderHandwriting(textInput.value)"></div>
-            <label><input type="checkbox" id="set-jitter" onchange="renderHandwriting(textInput.value)" checked> Drift</label>
-            <label><input type="checkbox" id="set-flow" onchange="renderHandwriting(textInput.value)" checked> Pressure</label>
-        </div>
-        <textarea id="textInput" placeholder="Start typing..." oninput="renderHandwriting(this.value)"></textarea>
-        <canvas id="outputCanvas" width="2400" height="1800"></canvas>
+        <textarea id="textInput" placeholder="Enter your math homework here..." oninput="renderHandwriting(this.value)"></textarea>
+        <canvas id="outputCanvas" width="2400" height="1200"></canvas>
+    </div>
+
+    <div id="wiki-ui" class="wiki-section hidden">
+        <h2>Project Wiki: Handwriting with MATH</h2>
+        <p><strong>Why this exists:</strong> Because I'm too lazy to write out my work on paper.</p>
+        
+        <h3>The Logic</h3>
+        <ul>
+            <li><strong>Coordinate Mapping:</strong> Every stroke is a collection of high-precision $(x, y)$ vectors. This isn't a font, but rather it's a simulation of motion.</li>
+            <li><strong>The Variant Lottery:</strong> Having 130+ variants means the chance of two identical letters appearing in the same paragraph is less than if you had only one variant per character, which makes it actually look like handwriting.</li>
+            <li><strong>The Recursive Loop:</strong> The more you train, the more "Letter Trail" ghosts you create, allowing the model to understand the boundaries of your style without being rigid. (yap for "more variation the more you write")</li>
+        </ul>
+
+        <h3>Practical Laziness Tips</h3>
+        <ul>
+            <li>Use <strong>High-Res PNG Export</strong> to drop the final output directly into digital assignments. Or print them out I guess.</li>
+            <li>Adjust <strong>Word Spacing</strong> to match your handwriting.</li>
+        </ul>
+        <button onclick="hideWiki()" style="margin-top:20px;">Back to App</button>
     </div>
 </div>
 
 <footer>
     <button onclick="downloadModel()">Save Model</button>
     <button onclick="document.getElementById('fileInput').click()">Load Model</button>
-    <button class="btn-filled" onclick="exportPNG()">Export High-Res PNG</button>
+    <button class="btn-filled" onclick="exportPNG()">Export PNG</button>
     <input type="file" id="fileInput" class="hidden" onchange="loadModel(event)">
 </footer>
 
@@ -122,66 +138,45 @@
     }
     function endDraw() { if (isDrawing) { letterStrokes.push([...currentPath]); isDrawing = false; } }
 
-    dCanvas.addEventListener('touchstart', startDraw, {passive: false}); dCanvas.addEventListener('touchmove', moveDraw, {passive: false}); dCanvas.addEventListener('touchend', endDraw, {passive: false});
     dCanvas.addEventListener('pointerdown', startDraw); dCanvas.addEventListener('pointermove', moveDraw); dCanvas.addEventListener('pointerup', endDraw);
+    dCanvas.addEventListener('touchstart', startDraw, {passive: false}); dCanvas.addEventListener('touchmove', moveDraw, {passive: false}); dCanvas.addEventListener('touchend', endDraw, {passive: false});
 
     function saveCurrentLetter() { 
         if(letterStrokes.length===0)return; 
         const all=letterStrokes.flat(), minX=Math.min(...all.map(p=>p.x)), maxX=Math.max(...all.map(p=>p.x)), minY=Math.min(...all.map(p=>p.y)); 
         const char = alphabet[currentIdx];
-        
         if (!modelData[char]) modelData[char] = [];
-        modelData[char].push({ 
-            strokes: letterStrokes.map(s=>s.map(p=>({x:p.x-minX,y:p.y-minY}))), 
-            width: maxX-minX, 
-            relativeBaseline: minY-BASELINE_Y 
-        }); 
-
+        modelData[char].push({ strokes: letterStrokes.map(s=>s.map(p=>({x:p.x-minX,y:p.y-minY}))), width: maxX-minX, relativeBaseline: minY-BASELINE_Y }); 
         currentIdx = (currentIdx + 1) % alphabet.length;
         document.getElementById('char-prompt').innerText = alphabet[currentIdx];
-        updateStats();
-        clearCanvas(); 
+        updateStats(); clearCanvas(); 
     }
 
     function resetIndex() { currentIdx = 0; document.getElementById('char-prompt').innerText = alphabet[currentIdx]; clearCanvas(); }
     function updateStats() { 
         let total = 0; Object.values(modelData).forEach(v => total += v.length);
-        document.getElementById('model-stats').innerText = `${Object.keys(modelData).length} characters mapped, ${total} total variants.`; 
+        document.getElementById('model-stats').innerText = `${Object.keys(modelData).length} characters, ${total} variants`; 
     }
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
-        let curX = 100, curY = 320; const scale = 0.85; 
-        const wordSpace = parseInt(document.getElementById('space-slider').value);
-        const kernAdjust = parseInt(document.getElementById('kern-slider').value);
-
+        let curX = 100, curY = 300; const scale = 0.85; 
         text.split(/(\s+)/).forEach(word => {
-            if (word.trim() === '') { curX += wordSpace * 2.5; return; }
-            let wordWidth = 0;
-            for (let char of word) {
-                const variants = modelData[char];
-                wordWidth += variants ? (variants[0].width * scale * 0.8) + kernAdjust : 25;
-            }
-            if (curX + wordWidth > oCanvas.width - 120) { curX = 100; curY += 320; }
+            if (word.trim() === '') { curX += 80; return; }
             for (let char of word) {
                 const variants = modelData[char];
                 if (variants) {
                     const v = variants[Math.floor(Math.random() * variants.length)];
                     oCtx.save();
-                    const dY = document.getElementById('set-jitter').checked ? (Math.sin(curX * 0.05) * 5) : 0;
-                    oCtx.translate(curX, curY + (v.relativeBaseline * scale) + dY);
-                    oCtx.strokeStyle = '#1e293b'; oCtx.lineCap = 'round'; oCtx.lineJoin = 'round';
+                    oCtx.translate(curX, curY + (v.relativeBaseline * scale));
+                    oCtx.strokeStyle = '#1e293b'; oCtx.lineWidth = 4.5; oCtx.lineCap = 'round';
                     v.strokes.forEach(s => {
                         oCtx.beginPath();
-                        s.forEach((p, i) => {
-                            oCtx.lineWidth = document.getElementById('set-flow').checked ? (4 + Math.sin(i * 0.4) * 1.1) : 4.5;
-                            if (i === 0) oCtx.moveTo(p.x * scale, p.y * scale);
-                            else oCtx.lineTo(p.x * scale, p.y * scale);
-                        });
+                        s.forEach((p, i) => i === 0 ? oCtx.moveTo(p.x * scale, p.y * scale) : oCtx.lineTo(p.x * scale, p.y * scale));
                         oCtx.stroke();
                     });
                     oCtx.restore();
-                    curX += (v.width * scale * 0.78) + kernAdjust;
+                    curX += (v.width * scale) + 10;
                 } else { curX += 25; }
             }
         });
@@ -189,10 +184,22 @@
 
     function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); drawGuide(); letterStrokes = []; }
     function undoStroke() { letterStrokes.pop(); dCtx.clearRect(0,0,400,400); drawGuide(); dCtx.strokeStyle = '#0f172a'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
-    function toggleMode() { document.getElementById('training-ui').classList.toggle('hidden'); document.getElementById('typing-ui').classList.toggle('hidden'); document.getElementById('mode-text').innerText = document.getElementById('training-ui').classList.contains('hidden') ? "Typing" : "Training"; if(!document.getElementById('typing-ui').classList.contains('hidden')) renderHandwriting(textInput.value); }
-    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_v22.json'; a.click(); }
-    function loadModel(e) { const f=e.target.files[0]; const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); updateStats(); renderHandwriting(textInput.value);}; r.readAsText(f); }
-    function exportPNG() { const l=document.createElement('a'); l.download='handwriting_v22.png'; l.href=oCanvas.toDataURL('image/png', 1.0); l.click(); }
+    
+    function toggleMode() { 
+        const isTraining = !document.getElementById('training-ui').classList.contains('hidden');
+        document.getElementById('training-ui').classList.toggle('hidden', isTraining);
+        document.getElementById('typing-ui').classList.toggle('hidden', !isTraining);
+        document.getElementById('wiki-ui').classList.add('hidden');
+        document.getElementById('mode-label').innerText = isTraining ? "Typing" : "Training";
+        document.getElementById('char-prompt').classList.toggle('hidden', isTraining);
+        if(isTraining) renderHandwriting(textInput.value);
+    }
+
+    function showWiki() { document.getElementById('wiki-ui').classList.remove('hidden'); document.getElementById('training-ui').classList.add('hidden'); document.getElementById('typing-ui').classList.add('hidden'); }
+    function hideWiki() { document.getElementById('wiki-ui').classList.add('hidden'); document.getElementById('training-ui').classList.remove('hidden'); }
+    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_model.json'; a.click(); }
+    function loadModel(e) { const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); updateStats();}; r.readAsText(e.target.files[0]); }
+    function exportPNG() { const l=document.createElement('a'); l.download='handwriting.png'; l.href=oCanvas.toDataURL('image/png'); l.click(); }
 </script>
 </body>
 </html>
