@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v7</title>
+    <title>Lutra Handwriting AI v8</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #1e293b; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -33,6 +33,7 @@
 
 <div class="main-container">
     <div id="training-ui" class="draw-card">
+        <div style="margin-bottom: 10px; font-size: 0.8rem; color: #64748b;">Draw relative to the bottom of the box (the baseline)</div>
         <canvas id="drawCanvas" width="400" height="400"></canvas>
         <div class="btn-group">
             <button onclick="clearCanvas()">Clear</button>
@@ -42,7 +43,7 @@
     </div>
 
     <div id="typing-ui" class="type-area hidden">
-        <textarea id="textInput" placeholder="Type here..."></textarea>
+        <textarea id="textInput" placeholder="Start typing..."></textarea>
         <canvas id="outputCanvas" width="1200" height="800"></canvas>
     </div>
 </div>
@@ -128,7 +129,9 @@
         modelData[alphabet[currentIdx]] = {
             strokes: letterStrokes.map(s => s.map(p => ({ x: p.x - minX, y: p.y - minY }))),
             width: maxX - minX,
-            height: maxY - minY
+            height: maxY - minY,
+            // Calculate how far the top of the letter is from the absolute bottom of the canvas
+            baselineY: dCanvas.height - minY 
         };
         currentIdx++;
         if (currentIdx < alphabet.length) document.getElementById('char-prompt').innerText = alphabet[currentIdx];
@@ -143,17 +146,10 @@
 
     function drawSpline(ctx, points, curX, curY, scale) {
         if (points.length < 2) return;
-        if (points.length === 2) {
-            ctx.beginPath();
-            ctx.moveTo(curX + points[0].x * scale, curY + points[0].y * scale);
-            ctx.lineTo(curX + points[1].x * scale, curY + points[1].y * scale);
-            ctx.stroke();
-            return;
-        }
         ctx.beginPath(); ctx.moveTo(curX + points[0].x * scale, curY + points[0].y * scale);
         for (let i = 0; i < points.length - 1; i++) {
-            const p0 = points[i === 0 ? i : i - 1], p1 = points[i], p2 = points[i + 1];
-            const p3 = points[i + 2 === points.length ? i + 1 : i + 2];
+            const p0 = points[Math.max(0, i - 1)], p1 = points[i], p2 = points[i + 1];
+            const p3 = points[Math.min(points.length - 1, i + 2)];
             for (let t = 0; t <= 1; t += 0.2) {
                 const t2 = t * t, t3 = t2 * t;
                 const x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
@@ -166,23 +162,22 @@
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
-        let curX = 50, curY = 120;
+        let curX = 50, curY = 150;
         const scale = 0.35;
 
         for (let char of text) {
             if (char === ' ') { curX += 40; continue; }
             if (char === '\n') { curX = 50; curY += 150; continue; }
-            const variants = modelData[char];
-            if (variants) {
-                const variant = Array.isArray(variants) ? variants[Math.floor(Math.random() * variants.length)] : variants;
+            const variant = modelData[char];
+            if (variant) {
                 oCtx.lineWidth = 2.0; oCtx.strokeStyle = '#000';
                 
-                const vOffset = (variant.height > 100) ? 0 : 10;
+                // --- THE HEIGHT FIX ---
+                // We use the recorded baselineY to align letters to a common line
+                // This prevents lowercase letters from floating too high.
+                const baselineShift = 100 - (variant.baselineY * scale);
                 
-                // Handle legacy structure vs new structure
-                const strokes = variant.strokes || [variant.points]; 
-                strokes.forEach(s => drawSpline(oCtx, s, curX, curY + vOffset, scale));
-                
+                variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY + baselineShift, scale));
                 curX += (variant.width * scale * 0.85) + 4; 
             }
             if (curX > oCanvas.width - 120) { curX = 50; curY += 150; }
@@ -191,7 +186,7 @@
 
     function downloadModel() {
         const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v7.json'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v8.json'; a.click();
     }
 
     function loadModel(e) {
@@ -200,16 +195,11 @@
         const reader = new FileReader();
         reader.onload = (event) => { 
             try {
-                const loaded = JSON.parse(event.target.result);
-                // Simple validation and re-render
-                modelData = loaded;
-                alert("Model loaded successfully!");
-                if (!document.getElementById('typing-ui').classList.contains('hidden')) {
-                    renderHandwriting(document.getElementById('textInput').value);
-                }
-            } catch(e) {
-                alert("Failed to load: Invalid JSON format.");
-            }
+                modelData = JSON.parse(event.target.result);
+                alert("Model loaded!");
+                // IMMEDIATE RENDER FIX:
+                renderHandwriting(document.getElementById('textInput').value); 
+            } catch(e) { alert("Failed to load."); }
         };
         reader.readAsText(file);
     }
