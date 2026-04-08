@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v13 - Pro Export</title>
+    <title>Lutra Handwriting AI v14</title>
     <style>
         :root { 
             --primary: #6366f1; --primary-hover: #4f46e5; --bg: #f1f5f9; 
@@ -25,7 +25,10 @@
             background: var(--panel); padding: 2rem; border-radius: 24px; 
             box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 100%; max-width: 480px; border: 1px solid var(--border);
         }
-        canvas#drawCanvas { background: #fafafa; border: 2px solid var(--border); border-radius: 16px; touch-action: none; display: block; margin: 0 auto; }
+        canvas#drawCanvas { 
+            background: #fafafa; border: 2px solid var(--border); border-radius: 16px; 
+            touch-action: none; display: block; margin: 0 auto; width: 100%; height: auto;
+        }
         .type-area { width: 100%; max-width: 1000px; display: flex; flex-direction: column; gap: 1rem; }
         .settings-bar { 
             display: flex; gap: 1rem; flex-wrap: wrap; background: #fff; padding: 1rem; 
@@ -64,10 +67,10 @@
 
     <div id="typing-ui" class="type-area hidden">
         <div class="settings-bar">
-            <label><input type="checkbox" id="set-jitter" onchange="renderHandwriting(textInput.value)" checked> Baseline Jitter</label>
-            <label><input type="checkbox" id="set-rotation" onchange="renderHandwriting(textInput.value)" checked> Random Rotation</label>
-            <label><input type="checkbox" id="set-flow" onchange="renderHandwriting(textInput.value)" checked> Ink Flow (Thickness)</label>
-            <label><input type="checkbox" id="set-kerning" onchange="renderHandwriting(textInput.value)" checked> Variable Kerning</label>
+            <label><input type="checkbox" id="set-jitter" onchange="renderHandwriting(textInput.value)" checked> Jitter</label>
+            <label><input type="checkbox" id="set-rotation" onchange="renderHandwriting(textInput.value)" checked> Rotation</label>
+            <label><input type="checkbox" id="set-flow" onchange="renderHandwriting(textInput.value)" checked> Ink Flow</label>
+            <label><input type="checkbox" id="set-kerning" onchange="renderHandwriting(textInput.value)" checked> Kerning</label>
         </div>
         <textarea id="textInput" placeholder="Write something..." oninput="renderHandwriting(this.value)"></textarea>
         <canvas id="outputCanvas" width="1200" height="800"></canvas>
@@ -98,29 +101,57 @@
 
     drawGuideLine();
 
+    // Unified Position Logic
+    function getPos(e) {
+        const rect = dCanvas.getBoundingClientRect();
+        // Uses clientX/Y which works for both PointerEvents and Touch
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        return { 
+            x: x * (dCanvas.width / rect.width), 
+            y: y * (dCanvas.height / rect.height), 
+            t: Date.now() 
+        };
+    }
+
+    // Pointer Events (Handles Mouse + Touch + Pen)
+    dCanvas.addEventListener('pointerdown', (e) => {
+        dCanvas.setPointerCapture(e.pointerId);
+        isDrawing = true;
+        const p = getPos(e);
+        dCtx.beginPath();
+        dCtx.moveTo(p.x, p.y);
+        currentPath = [p];
+    });
+
+    dCanvas.addEventListener('pointermove', (e) => {
+        if (!isDrawing) return;
+        const p = getPos(e);
+        const last = currentPath[currentPath.length-1];
+        const dist = Math.hypot(p.x - last.x, p.y - last.y);
+        const speed = dist / Math.max(1, p.t - last.t);
+        
+        dCtx.lineWidth = Math.max(2, 5 - speed * 1.2);
+        dCtx.lineCap = 'round';
+        dCtx.strokeStyle = '#1e293b';
+        dCtx.lineTo(p.x, p.y);
+        dCtx.stroke();
+        currentPath.push(p);
+    });
+
+    dCanvas.addEventListener('pointerup', (e) => {
+        if (isDrawing) {
+            letterStrokes.push([...currentPath]);
+            isDrawing = false;
+        }
+        dCanvas.releasePointerCapture(e.pointerId);
+    });
+
     function drawGuideLine() {
         dCtx.save(); dCtx.setLineDash([6, 10]); dCtx.strokeStyle = '#cbd5e1'; dCtx.lineWidth = 2;
         dCtx.beginPath(); dCtx.moveTo(0, GUIDE_LINE_Y); dCtx.lineTo(dCanvas.width, GUIDE_LINE_Y); dCtx.stroke();
         dCtx.restore();
     }
-
-    function getPos(e) {
-        const rect = dCanvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: (clientX - rect.left) * (dCanvas.width / rect.width), y: (clientY - rect.top) * (dCanvas.height / rect.height), t: Date.now() };
-    }
-
-    dCanvas.addEventListener('mousedown', (e) => { isDrawing = true; const p = getPos(e); dCtx.beginPath(); dCtx.moveTo(p.x, p.y); currentPath = [p]; });
-    window.addEventListener('mousemove', (e) => {
-        if (!isDrawing) return;
-        const p = getPos(e);
-        const last = currentPath[currentPath.length-1];
-        const speed = Math.hypot(p.x - last.x, p.y - last.y) / Math.max(1, p.t - last.t);
-        dCtx.lineWidth = Math.max(2, 5 - speed * 1.2); dCtx.lineCap = 'round'; dCtx.strokeStyle = '#1e293b';
-        dCtx.lineTo(p.x, p.y); dCtx.stroke(); currentPath.push(p);
-    });
-    window.addEventListener('mouseup', () => { if (isDrawing) { letterStrokes.push([...currentPath]); isDrawing = false; } });
 
     function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); drawGuideLine(); letterStrokes = []; }
     function undoStroke() { letterStrokes.pop(); redrawTraining(); }
