@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v4 (High-Fi)</title>
+    <title>Lutra Handwriting AI v5</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #1e293b; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -28,7 +28,7 @@
 
 <header>
     <div class="mode-indicator" id="status">TRAINING <span id="char-prompt">A</span></div>
-    <button class="btn-filled" onclick="toggleMode()">Switch to Type Mode</button>
+    <button class="btn-filled" onclick="toggleMode()">Switch Mode</button>
 </header>
 
 <div class="main-container">
@@ -42,7 +42,7 @@
     </div>
 
     <div id="typing-ui" class="type-area hidden">
-        <textarea id="textInput" placeholder="Write something..."></textarea>
+        <textarea id="textInput" placeholder="Start typing..."></textarea>
         <canvas id="outputCanvas" width="1200" height="800"></canvas>
     </div>
 </div>
@@ -88,19 +88,15 @@
         if (!isDrawing) return;
         e.preventDefault();
         const pos = getPos(e);
-        
-        // Dynamic brush thickness based on speed
         const lastPos = currentPath[currentPath.length - 1];
         const dist = Math.hypot(pos.x - lastPos.x, pos.y - lastPos.y);
-        const time = pos.t - lastPos.t;
-        const speed = dist / Math.max(1, time);
+        const speed = dist / Math.max(1, pos.t - lastPos.t);
         
-        dCtx.lineWidth = Math.max(1.5, 5 - speed * 2);
+        dCtx.lineWidth = Math.max(1.8, 5 - speed * 1.5);
         dCtx.lineCap = 'round';
         dCtx.strokeStyle = '#1e293b';
         dCtx.lineTo(pos.x, pos.y);
         dCtx.stroke();
-        
         currentPath.push(pos);
     }
 
@@ -149,28 +145,21 @@
     function toggleMode() {
         document.getElementById('training-ui').classList.toggle('hidden');
         document.getElementById('typing-ui').classList.toggle('hidden');
-        if (!document.getElementById('typing-ui').classList.contains('hidden')) {
-            renderHandwriting(document.getElementById('textInput').value);
-        }
+        if (!document.getElementById('typing-ui').classList.contains('hidden')) renderHandwriting(document.getElementById('textInput').value);
     }
 
-    document.getElementById('textInput').addEventListener('input', (e) => renderHandwriting(e.target.value));
-
-    // CATMULL-ROM SMOOTHING LOGIC
+    // CATMULL-ROM SMOOTHING
     function drawSpline(ctx, points, curX, curY, scale) {
         if (points.length < 3) return;
         ctx.beginPath();
         ctx.moveTo(curX + points[0].x * scale, curY + points[0].y * scale);
-
         for (let i = 0; i < points.length - 1; i++) {
             const p0 = points[i === 0 ? i : i - 1];
             const p1 = points[i];
             const p2 = points[i + 1];
             const p3 = points[i + 2 === points.length ? i + 1 : i + 2];
-
-            for (let t = 0; t <= 1; t += 0.1) {
-                const t2 = t * t;
-                const t3 = t2 * t;
+            for (let t = 0; t <= 1; t += 0.15) {
+                const t2 = t * t, t3 = t2 * t;
                 const x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
                 const y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
                 ctx.lineTo(curX + x * scale, curY + y * scale);
@@ -181,28 +170,32 @@
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
-        let curX = 50, curY = 100, scale = 0.4;
+        let curX = 50, curY = 120;
+        const scale = 0.35;
+        const letterSpacing = -5; // ADJUST THIS to tighten letters (negative = closer)
+
         for (let char of text) {
-            if (char === ' ') { curX += 50; continue; }
+            if (char === ' ') { curX += 45; continue; }
             if (char === '\n') { curX = 50; curY += 150; continue; }
             const variant = modelData[char];
             if (variant) {
-                oCtx.lineWidth = 2.5; oCtx.strokeStyle = '#000';
+                oCtx.lineWidth = 2.2; oCtx.strokeStyle = '#000';
                 variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY, scale));
-                curX += (variant.width * scale) + 20;
+                // THE FIX: Move cursor by width then apply the negative spacing
+                curX += (variant.width * scale) + letterSpacing;
             }
-            if (curX > oCanvas.width - 100) { curX = 50; curY += 150; }
+            if (curX > oCanvas.width - 120) { curX = 50; curY += 150; }
         }
     }
 
     function downloadModel() {
         const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'high_fi_handwriting.json'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v5.json'; a.click();
     }
 
     function loadModel(e) {
         const reader = new FileReader();
-        reader.onload = (event) => { modelData = JSON.parse(event.target.result); alert("Model loaded!"); };
+        reader.onload = (event) => { modelData = JSON.parse(event.target.result); alert("Model loaded!"); renderHandwriting(document.getElementById('textInput').value); };
         reader.readAsText(e.target.files[0]);
     }
 </script>
