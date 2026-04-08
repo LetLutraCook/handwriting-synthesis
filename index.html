@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v9</title>
+    <title>Lutra Handwriting AI v10</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #1e293b; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -33,6 +33,7 @@
 
 <div class="main-container">
     <div id="training-ui" class="draw-card">
+        <div style="margin-bottom: 10px; font-size: 0.8rem; color: #64748b;">Draw on the dotted line (leave room for tails)</div>
         <canvas id="drawCanvas" width="400" height="400"></canvas>
         <div class="btn-group">
             <button onclick="clearCanvas()">Clear</button>
@@ -55,6 +56,7 @@
 
 <script>
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?! ";
+    const GUIDE_LINE_Y = 300; // 75% of canvas height (400)
     let currentIdx = 0;
     let modelData = {}; 
     let isDrawing = false;
@@ -65,6 +67,20 @@
     const dCtx = dCanvas.getContext('2d');
     const oCanvas = document.getElementById('outputCanvas');
     const oCtx = oCanvas.getContext('2d');
+
+    // Initialize Training Canvas with Guide Line
+    drawGuideLine();
+
+    function drawGuideLine() {
+        dCtx.save();
+        dCtx.setLineDash([5, 5]);
+        dCtx.strokeStyle = '#cbd5e1';
+        dCtx.beginPath();
+        dCtx.moveTo(0, GUIDE_LINE_Y);
+        dCtx.lineTo(dCanvas.width, GUIDE_LINE_Y);
+        dCtx.stroke();
+        dCtx.restore();
+    }
 
     function getPos(e) {
         const rect = dCanvas.getBoundingClientRect();
@@ -105,11 +121,17 @@
     window.addEventListener('mousemove', (e) => isDrawing && move(e));
     window.addEventListener('mouseup', stop);
 
-    function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); letterStrokes = []; }
+    function clearCanvas() { 
+        dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); 
+        drawGuideLine();
+        letterStrokes = []; 
+    }
+    
     function undoStroke() { letterStrokes.pop(); redrawTrainingCanvas(); }
 
     function redrawTrainingCanvas() {
         dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height);
+        drawGuideLine();
         letterStrokes.forEach(stroke => {
             dCtx.beginPath();
             stroke.forEach((p, i) => { if (i === 0) dCtx.moveTo(p.x, p.y); else dCtx.lineTo(p.x, p.y); });
@@ -128,7 +150,9 @@
         modelData[alphabet[currentIdx]] = {
             strokes: letterStrokes.map(s => s.map(p => ({ x: p.x - minX, y: p.y - minY }))),
             width: maxX - minX,
-            height: maxY - minY
+            height: maxY - minY,
+            // Vertical offset relative to the dotted line
+            relativeBaseline: minY - GUIDE_LINE_Y 
         };
         currentIdx++;
         if (currentIdx < alphabet.length) document.getElementById('char-prompt').innerText = alphabet[currentIdx];
@@ -170,14 +194,13 @@
             if (variant) {
                 oCtx.lineWidth = 2.0; oCtx.strokeStyle = '#000';
                 
-                // --- AUTO-CENTERING HEIGHT FIX ---
-                // We center the letter relative to a fixed 100px-high line segment
-                const centerY = (100 - (variant.height * scale)) / 2;
+                // --- LINE-BASED VERTICAL ALIGNMENT ---
+                // relativeBaseline is the distance from the guide line to the top of the letter
+                const yOffset = (variant.relativeBaseline || 0) * scale;
                 
-                variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY + centerY, scale));
+                variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY + yOffset, scale));
                 curX += (variant.width * scale * 0.85) + 4; 
             } else {
-                // Skip untrained letters but still move the cursor forward for flow
                 curX += 20;
             }
             if (curX > oCanvas.width - 120) { curX = 50; curY += 150; }
@@ -186,7 +209,7 @@
 
     function downloadModel() {
         const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v9.json'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v10.json'; a.click();
     }
 
     function loadModel(e) {
