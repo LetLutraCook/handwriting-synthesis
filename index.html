@@ -3,54 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v18</title>
+    <title>Lutra Handwriting AI v19</title>
     <style>
-        :root { --primary: #6366f1; --bg: #f1f5f9; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0; }
+        :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        
-        /* Industrial-grade selection/magnifier prevention */
         body { 
             font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: var(--text); 
             height: 100vh; display: flex; flex-direction: column; overflow: hidden;
-            user-select: none; -webkit-user-select: none;
-            touch-action: none; /* Disables all browser gestures including zoom/magnify */
+            user-select: none; -webkit-user-select: none; touch-action: none;
         }
-
-        header { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(8px); padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 100; }
-        #char-prompt { background: #e0e7ff; color: var(--primary); padding: 4px 12px; border-radius: 6px; font-weight: 700; }
-        .main-container { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.5rem; gap: 1.5rem; overflow-y: auto; padding-bottom: 120px; }
-        
-        .card { background: var(--panel); padding: 1.5rem; border-radius: 24px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); width: 100%; max-width: 480px; border: 1px solid var(--border); }
-        canvas#drawCanvas { background: #fafafa; border: 2px solid var(--border); border-radius: 16px; display: block; margin: 0 auto; cursor: crosshair; }
-        
-        .type-area { width: 100%; max-width: 1000px; display: flex; flex-direction: column; gap: 1rem; }
-        .settings-bar { display: flex; gap: 1.5rem; flex-wrap: wrap; background: #fff; padding: 1.25rem; border-radius: 12px; border: 1px solid var(--border); align-items: center; }
-        .slider-group { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; font-weight: 600; color: #64748b; }
-        
-        textarea { width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 1rem; min-height: 80px; outline: none; user-select: text !important; -webkit-user-select: text !important; }
+        header { background: #fff; padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 100; }
+        #char-prompt { background: #e0e7ff; color: var(--primary); padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; }
+        .main-container { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.5rem; gap: 1rem; overflow-y: auto; padding-bottom: 120px; }
+        .card { background: var(--panel); padding: 1.5rem; border-radius: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); width: 100%; max-width: 500px; border: 1px solid var(--border); }
+        canvas#drawCanvas { background: #fdfdfd; border: 2px solid var(--border); border-radius: 16px; display: block; margin: 0 auto; cursor: crosshair; }
+        .type-area { width: 100%; max-width: 1100px; display: flex; flex-direction: column; gap: 1rem; }
+        .settings-bar { display: flex; gap: 2rem; flex-wrap: wrap; background: #fff; padding: 1.25rem; border-radius: 16px; border: 1px solid var(--border); align-items: center; }
+        .slider-group { display: flex; flex-direction: column; gap: 6px; font-size: 0.75rem; font-weight: 700; color: #475569; min-width: 140px; }
+        textarea { width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 1rem; min-height: 100px; outline: none; font-size: 1rem; user-select: text !important; -webkit-user-select: text !important; }
         #outputCanvas { border-radius: 16px; border: 1px solid var(--border); width: 100%; background: #fff; pointer-events: none; }
-        
-        button { padding: 0.7rem 1.25rem; border-radius: 12px; border: 1px solid var(--border); background: white; font-weight: 600; cursor: pointer; }
+        button { padding: 0.7rem 1.25rem; border-radius: 12px; border: 1px solid var(--border); background: white; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.95); }
         .btn-filled { background: var(--primary); color: white; border: none; }
-        footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 1.25rem; background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(12px); border-top: 1px solid var(--border); display: flex; gap: 12px; justify-content: center; }
+        footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 1.25rem; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(16px); border-top: 1px solid var(--border); display: flex; gap: 12px; justify-content: center; }
         .hidden { display: none !important; }
     </style>
 </head>
-<body>
+<body oncontextmenu="return false;">
 
 <header>
-    <div class="mode-indicator">Mode: <span id="mode-text">Training</span> <span id="char-prompt">A</span></div>
-    <button class="btn-filled" onclick="toggleMode()">Switch Mode</button>
+    <div style="font-weight: 600;">Mode: <span id="mode-text" style="color:var(--primary)">Training</span> <span id="char-prompt">A</span></div>
+    <button class="btn-filled" onclick="toggleMode()">Switch to Type Mode</button>
 </header>
 
 <div class="main-container">
-    <div id="training-ui" class="card">
+    <div id="training-ui" class="card" onselectstart="return false;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <span style="font-size:0.8rem; color:#64748b;">Draw on baseline</span>
-            <label style="font-size:0.75rem;"><input type="checkbox" id="set-onion" checked> Onion Skin</label>
+            <span style="font-size:0.85rem; color:#64748b;">Draw on the baseline</span>
+            <label style="font-size:0.8rem; font-weight:600;"><input type="checkbox" id="set-onion" checked> Onion Skin</label>
         </div>
         <canvas id="drawCanvas" width="400" height="400"></canvas>
-        <div style="display:flex; gap:10px; margin-top:15px; justify-content:center;">
+        <div style="display:flex; gap:10px; margin-top:20px; justify-content:center;">
             <button onclick="clearCanvas()">Clear</button>
             <button onclick="undoStroke()">Undo</button>
             <button class="btn-filled" onclick="saveCurrentLetter()">Save & Next</button>
@@ -59,18 +52,12 @@
 
     <div id="typing-ui" class="type-area hidden">
         <div class="settings-bar">
-            <div class="slider-group">
-                Word Spacing
-                <input type="range" id="space-slider" min="5" max="100" value="30" oninput="renderHandwriting(textInput.value)">
-            </div>
-            <div class="slider-group">
-                Letter Tightness
-                <input type="range" id="kern-slider" min="-10" max="30" value="8" oninput="renderHandwriting(textInput.value)">
-            </div>
-            <label><input type="checkbox" id="set-jitter" onchange="renderHandwriting(textInput.value)" checked> Drift</label>
-            <label><input type="checkbox" id="set-flow" onchange="renderHandwriting(textInput.value)" checked> Pressure</label>
+            <div class="slider-group">Word Spacing <input type="range" id="space-slider" min="5" max="80" value="25" oninput="renderHandwriting(textInput.value)"></div>
+            <div class="slider-group">Letter Tightness <input type="range" id="kern-slider" min="-10" max="25" value="6" oninput="renderHandwriting(textInput.value)"></div>
+            <label style="font-weight:600;"><input type="checkbox" id="set-jitter" onchange="renderHandwriting(textInput.value)" checked> Drift</label>
+            <label style="font-weight:600;"><input type="checkbox" id="set-flow" onchange="renderHandwriting(textInput.value)" checked> Pressure</label>
         </div>
-        <textarea id="textInput" placeholder="Type here..." oninput="renderHandwriting(this.value)"></textarea>
+        <textarea id="textInput" placeholder="Start typing..." oninput="renderHandwriting(this.value)"></textarea>
         <canvas id="outputCanvas" width="2400" height="1800"></canvas>
     </div>
 </div>
@@ -92,30 +79,25 @@
     const oCanvas = document.getElementById('outputCanvas'), oCtx = oCanvas.getContext('2d');
     const textInput = document.getElementById('textInput');
 
-    // Prevents iPad magnifier/context menu on specific elements
-    [dCanvas, oCanvas, document.body].forEach(el => {
-        el.addEventListener('contextmenu', e => e.preventDefault());
-    });
-
     function drawGuide() {
         dCtx.save();
-        dCtx.setLineDash([5, 8]); dCtx.strokeStyle = '#cbd5e1'; dCtx.lineWidth = 2;
+        dCtx.setLineDash([6, 10]); dCtx.strokeStyle = '#e2e8f0'; dCtx.lineWidth = 2;
         dCtx.beginPath(); dCtx.moveTo(0, BASELINE_Y); dCtx.lineTo(dCanvas.width, BASELINE_Y); dCtx.stroke();
         
         if (document.getElementById('set-onion').checked && historyKeys.length > 0) {
-            dCtx.globalAlpha = 0.12; dCtx.strokeStyle = '#6366f1';
+            dCtx.globalAlpha = 0.1; dCtx.strokeStyle = '#6366f1';
             let offset = 20;
             historyKeys.slice(-3).forEach(key => {
-                const variant = modelData[key];
-                variant.strokes.forEach(stroke => {
+                const v = modelData[key];
+                v.strokes.forEach(stroke => {
                     dCtx.beginPath();
                     stroke.forEach((p, i) => {
-                        if (i === 0) dCtx.moveTo(p.x + offset, p.y + BASELINE_Y + variant.relativeBaseline);
-                        else dCtx.lineTo(p.x + offset, p.y + BASELINE_Y + variant.relativeBaseline);
+                        if (i === 0) dCtx.moveTo(p.x + offset, p.y + BASELINE_Y + v.relativeBaseline);
+                        else dCtx.lineTo(p.x + offset, p.y + BASELINE_Y + v.relativeBaseline);
                     });
                     dCtx.stroke();
                 });
-                offset += variant.width + 15;
+                offset += v.width + 12;
             });
         }
         dCtx.restore();
@@ -136,7 +118,7 @@
         if (!isDrawing) return; e.preventDefault();
         const p = getPos(e); const last = currentPath[currentPath.length-1];
         const speed = Math.hypot(p.x - last.x, p.y - last.y) / Math.max(1, p.t - last.t);
-        dCtx.lineWidth = Math.max(2, 5 - speed * 1.2); dCtx.lineCap = 'round'; dCtx.strokeStyle = '#1e293b';
+        dCtx.lineWidth = Math.max(2.2, 5.5 - speed * 1.5); dCtx.lineCap = 'round'; dCtx.strokeStyle = '#0f172a';
         dCtx.lineTo(p.x, p.y); dCtx.stroke(); currentPath.push(p);
     });
 
@@ -144,52 +126,49 @@
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
-        // Scale adjusted for the 2400px canvas
-        let curX = 100, curY = 300; const scale = 0.9; 
+        let curX = 100, curY = 320; const scale = 0.85; 
         const useJitter = document.getElementById('set-jitter').checked;
         const useFlow = document.getElementById('set-flow').checked;
         const wordSpace = parseInt(document.getElementById('space-slider').value);
         const kernAdjust = parseInt(document.getElementById('kern-slider').value);
 
-        const words = text.split(/(\s+)/);
-        words.forEach(word => {
-            if (word.trim() === '') { curX += wordSpace * 2; return; }
+        text.split(/(\s+)/).forEach(word => {
+            if (word.trim() === '') { curX += wordSpace * 2.5; return; }
             let wordWidth = 0;
             for (let char of word) {
                 const v = modelData[char];
-                wordWidth += v ? (v.width * scale * 0.85) + kernAdjust : 30;
+                wordWidth += v ? (v.width * scale * 0.8) + kernAdjust : 25;
             }
-            if (curX + wordWidth > oCanvas.width - 100) { curX = 100; curY += 350; }
+            if (curX + wordWidth > oCanvas.width - 120) { curX = 100; curY += 320; }
             for (let char of word) {
-                const variant = modelData[char];
-                if (variant) {
+                const v = modelData[char];
+                if (v) {
                     oCtx.save();
-                    const driftY = useJitter ? (Math.sin(curX * 0.04) * 6) : 0;
-                    const rot = useJitter ? (Math.sin(curX * 0.02) * 0.02) : 0;
-                    oCtx.translate(curX, curY + (variant.relativeBaseline * scale) + driftY);
+                    const dY = useJitter ? (Math.sin(curX * 0.05) * 5) : 0;
+                    const rot = useJitter ? (Math.sin(curX * 0.02) * 0.015) : 0;
+                    oCtx.translate(curX, curY + (v.relativeBaseline * scale) + dY);
                     oCtx.rotate(rot);
-                    oCtx.strokeStyle = '#111827'; oCtx.lineCap = 'round'; oCtx.lineJoin = 'round';
-                    variant.strokes.forEach(s => {
+                    oCtx.strokeStyle = '#1e293b'; oCtx.lineCap = 'round'; oCtx.lineJoin = 'round';
+                    v.strokes.forEach(s => {
                         oCtx.beginPath();
                         s.forEach((p, i) => {
-                            oCtx.lineWidth = useFlow ? (4.2 + Math.sin(i * 0.4) * 0.9) : 4.5;
+                            oCtx.lineWidth = useFlow ? (4 + Math.sin(i * 0.4) * 1.1) : 4.5;
                             if (i === 0) oCtx.moveTo(p.x * scale, p.y * scale);
                             else { oCtx.lineTo(p.x * scale, p.y * scale); oCtx.stroke(); oCtx.beginPath(); oCtx.moveTo(p.x * scale, p.y * scale); }
                         });
                     });
                     oCtx.restore();
-                    curX += (variant.width * scale * 0.82) + kernAdjust;
-                } else { curX += 30; }
+                    curX += (v.width * scale * 0.78) + kernAdjust;
+                } else { curX += 25; }
             }
         });
     }
 
     function clearCanvas() { dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height); drawGuide(); letterStrokes = []; }
-    function undoStroke() { letterStrokes.pop(); dCtx.clearRect(0,0,400,400); drawGuide(); dCtx.strokeStyle = '#1e293b'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
+    function undoStroke() { letterStrokes.pop(); dCtx.clearRect(0,0,400,400); drawGuide(); dCtx.strokeStyle = '#0f172a'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
     function saveCurrentLetter() { 
         if(letterStrokes.length===0)return; 
-        const all=letterStrokes.flat(); 
-        const minX=Math.min(...all.map(p=>p.x)), maxX=Math.max(...all.map(p=>p.x)), minY=Math.min(...all.map(p=>p.y)); 
+        const all=letterStrokes.flat(), minX=Math.min(...all.map(p=>p.x)), maxX=Math.max(...all.map(p=>p.x)), minY=Math.min(...all.map(p=>p.y)); 
         const key = alphabet[currentIdx];
         modelData[key] = { strokes: letterStrokes.map(s=>s.map(p=>({x:p.x-minX,y:p.y-minY}))), width: maxX-minX, relativeBaseline: minY-BASELINE_Y }; 
         historyKeys.push(key);
@@ -197,9 +176,9 @@
         clearCanvas(); 
     }
     function toggleMode() { document.getElementById('training-ui').classList.toggle('hidden'); document.getElementById('typing-ui').classList.toggle('hidden'); document.getElementById('mode-text').innerText = document.getElementById('training-ui').classList.contains('hidden') ? "Typing" : "Training"; if(!document.getElementById('typing-ui').classList.contains('hidden')) renderHandwriting(textInput.value); }
-    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='model.json'; a.click(); }
+    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_model.json'; a.click(); }
     function loadModel(e) { const f=e.target.files[0]; const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); historyKeys = Object.keys(modelData); renderHandwriting(textInput.value);}; r.readAsText(f); }
-    function exportPNG() { const l=document.createElement('a'); l.download='handwriting_hd.png'; l.href=oCanvas.toDataURL('image/png', 1.0); l.click(); }
+    function exportPNG() { const l=document.createElement('a'); l.download='handwriting_v19.png'; l.href=oCanvas.toDataURL('image/png', 1.0); l.click(); }
 </script>
 </body>
 </html>
