@@ -1,2 +1,2 @@
 # handwriting-synthesis
-Synthesize handwriting
+Synthesize handwriting using math instead of janky ai
