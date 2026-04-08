@@ -3,12 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v11</title>
+    <title>Lutra Handwriting AI v12</title>
     <style>
-        :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #1e293b; }
+        :root { 
+            --primary: #6366f1; 
+            --primary-hover: #4f46e5;
+            --bg: #f1f5f9; 
+            --panel: #ffffff; 
+            --text: #0f172a; 
+            --text-light: #64748b;
+            --border: #e2e8f0;
+        }
+        
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
         body { 
-            font-family: 'Inter', system-ui, sans-serif; 
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background: var(--bg); 
             margin: 0; 
             color: var(--text); 
@@ -17,88 +27,149 @@
             flex-direction: column; 
             overflow: hidden; 
         }
+
+        /* Smooth Glass Header */
         header { 
-            background: var(--panel); 
-            padding: 1rem 1.5rem; 
-            border-bottom: 1px solid #e2e8f0; 
+            background: rgba(255, 255, 255, 0.8); 
+            backdrop-filter: blur(8px);
+            padding: 0.75rem 1.5rem; 
+            border-bottom: 1px solid var(--border); 
             display: flex; 
             justify-content: space-between; 
             align-items: center; 
             flex-shrink: 0;
+            z-index: 100;
         }
-        .mode-indicator { font-weight: 800; font-size: 0.9rem; }
-        #char-prompt { background: #fee2e2; color: #ef4444; padding: 2px 8px; border-radius: 4px; }
+
+        .mode-indicator { 
+            font-weight: 700; 
+            font-size: 0.85rem; 
+            letter-spacing: 0.05em; 
+            text-transform: uppercase;
+            color: var(--text-light);
+        }
+
+        #char-prompt { 
+            background: #e0e7ff; 
+            color: var(--primary); 
+            padding: 4px 12px; 
+            border-radius: 6px; 
+            font-size: 1.1rem;
+            margin-left: 8px;
+        }
         
         .main-container { 
             flex: 1; 
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            padding: 1rem; 
-            gap: 1rem; 
+            padding: 2rem 1rem; 
+            gap: 2rem; 
             overflow-y: auto;
-            padding-bottom: 100px; /* Space for fixed footer */
+            padding-bottom: 120px; 
         }
         
-        .draw-card { 
+        /* Modern Card Styling */
+        .card { 
             background: var(--panel); 
-            padding: 1.5rem; 
-            border-radius: 20px; 
-            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); 
+            padding: 2rem; 
+            border-radius: 24px; 
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 10px 15px -3px rgba(0,0,0,0.1); 
             width: 100%; 
-            max-width: 440px; 
-            text-align: center; 
+            max-width: 480px; 
+            border: 1px solid var(--border);
         }
         
-        /* Canvas stays inside the card box */
         canvas#drawCanvas { 
-            background: #fcfcfc; 
-            border: 2px dashed #cbd5e1; 
-            border-radius: 12px; 
+            background: #fafafa; 
+            border: 2px solid var(--border); 
+            border-radius: 16px; 
             touch-action: none; 
             cursor: crosshair; 
             display: block; 
             margin: 0 auto;
-            max-width: 100%;
-            height: auto;
+            transition: border-color 0.2s;
+        }
+
+        canvas#drawCanvas:active { border-color: var(--primary); }
+        
+        .type-area { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 1.5rem; }
+        
+        textarea { 
+            width: 100%; 
+            border: 1px solid var(--border); 
+            border-radius: 16px; 
+            padding: 1.25rem; 
+            font-size: 1rem; 
+            min-height: 100px; 
+            outline: none; 
+            transition: ring 0.2s;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1); }
+        
+        #outputCanvas { 
+            background: white; 
+            border-radius: 16px; 
+            border: 1px solid var(--border); 
+            width: 100%; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         
-        .type-area { width: 100%; max-width: 900px; display: flex; flex-direction: column; gap: 1rem; }
-        textarea { width: 100%; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1rem; font-size: 1rem; min-height: 80px; outline: none; }
-        #outputCanvas { background: white; border-radius: 12px; border: 1px solid #e2e8f0; width: 100%; height: auto; }
+        .btn-group { display: flex; gap: 0.75rem; margin-top: 1.5rem; justify-content: center; }
         
-        .btn-group { display: flex; gap: 0.5rem; margin-top: 1rem; justify-content: center; flex-wrap: wrap; }
-        button { padding: 0.6rem 1rem; border-radius: 10px; border: 1px solid #e2e8f0; background: white; font-weight: 600; cursor: pointer; transition: all 0.2s; }
-        .btn-filled { background: var(--primary); color: white; border: none; }
+        button { 
+            padding: 0.7rem 1.25rem; 
+            border-radius: 12px; 
+            border: 1px solid var(--border); 
+            background: white; 
+            font-weight: 600; 
+            color: var(--text);
+            cursor: pointer; 
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        button:hover { background: #f8fafc; transform: translateY(-1px); }
+        button:active { transform: translateY(0); }
+
+        .btn-filled { 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            box-shadow: 0 4px 6px rgba(99, 102, 241, 0.2);
+        }
+
+        .btn-filled:hover { background: var(--primary-hover); box-shadow: 0 6px 8px rgba(99, 102, 241, 0.3); }
         
-        /* Fixed footer pinned to bottom of screen */
         footer { 
             position: fixed;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 1.5rem; 
-            background: rgba(255, 255, 255, 0.9); 
-            backdrop-filter: blur(10px);
-            border-top: 1px solid #e2e8f0; 
+            bottom: 0; left: 0; right: 0;
+            padding: 1.25rem; 
+            background: rgba(255, 255, 255, 0.7); 
+            backdrop-filter: blur(12px);
+            border-top: 1px solid var(--border); 
             display: flex; 
             gap: 12px; 
             justify-content: center; 
             z-index: 1000;
         }
+
         .hidden { display: none !important; }
+
+        .instruction { font-size: 0.85rem; color: var(--text-light); margin-bottom: 1rem; }
     </style>
 </head>
 <body>
 
 <header>
-    <div class="mode-indicator" id="status">TRAINING <span id="char-prompt">A</span></div>
+    <div class="mode-indicator">Mode: <span id="mode-text">Training</span> <span id="char-prompt">A</span></div>
     <button class="btn-filled" onclick="toggleMode()">Switch Mode</button>
 </header>
 
 <div class="main-container">
-    <div id="training-ui" class="draw-card">
-        <div style="margin-bottom: 10px; font-size: 0.8rem; color: #64748b;">Draw on the dotted baseline (leave room for tails)</div>
+    <div id="training-ui" class="card">
+        <div class="instruction">Draw the character on the dotted baseline</div>
         <canvas id="drawCanvas" width="400" height="400"></canvas>
         <div class="btn-group">
             <button onclick="clearCanvas()">Clear</button>
@@ -108,7 +179,7 @@
     </div>
 
     <div id="typing-ui" class="type-area hidden">
-        <textarea id="textInput" placeholder="Type here..." oninput="renderHandwriting(this.value)"></textarea>
+        <textarea id="textInput" placeholder="Write something..." oninput="renderHandwriting(this.value)"></textarea>
         <canvas id="outputCanvas" width="1200" height="800"></canvas>
     </div>
 </div>
@@ -135,10 +206,9 @@
 
     drawGuideLine();
 
-    // Fix: Redraw guide line without stacking transparency
     function drawGuideLine() {
         dCtx.save();
-        dCtx.setLineDash([5, 8]);
+        dCtx.setLineDash([6, 10]);
         dCtx.strokeStyle = '#cbd5e1';
         dCtx.lineWidth = 2;
         dCtx.beginPath();
@@ -152,14 +222,9 @@
         const rect = dCanvas.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        // Adjust for CSS scaling
         const scaleX = dCanvas.width / rect.width;
         const scaleY = dCanvas.height / rect.height;
-        return { 
-            x: (clientX - rect.left) * scaleX, 
-            y: (clientY - rect.top) * scaleY, 
-            t: Date.now() 
-        };
+        return { x: (clientX - rect.left) * scaleX, y: (clientY - rect.top) * scaleY, t: Date.now() };
     }
 
     function start(e) {
@@ -232,15 +297,18 @@
         if (currentIdx < alphabet.length) {
             document.getElementById('char-prompt').innerText = alphabet[currentIdx];
         } else {
-            document.getElementById('char-prompt').innerText = "DONE";
+            document.getElementById('char-prompt').innerText = "✓";
         }
         clearCanvas();
     }
 
     function toggleMode() {
+        const isTraining = !document.getElementById('training-ui').classList.contains('hidden');
         document.getElementById('training-ui').classList.toggle('hidden');
         document.getElementById('typing-ui').classList.toggle('hidden');
-        if (!document.getElementById('typing-ui').classList.contains('hidden')) renderHandwriting(document.getElementById('textInput').value);
+        document.getElementById('mode-text').innerText = isTraining ? "Typing" : "Training";
+        document.getElementById('char-prompt').classList.toggle('hidden');
+        if (isTraining) renderHandwriting(document.getElementById('textInput').value);
     }
 
     function drawSpline(ctx, points, curX, curY, scale) {
@@ -261,29 +329,29 @@
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
-        let curX = 50, curY = 150;
-        const scale = 0.35;
+        let curX = 60, curY = 160;
+        const scale = 0.4;
 
         for (let char of text) {
-            if (char === ' ') { curX += 40; continue; }
-            if (char === '\n') { curX = 50; curY += 150; continue; }
+            if (char === ' ') { curX += 45; continue; }
+            if (char === '\n') { curX = 60; curY += 160; continue; }
             
             const variant = modelData[char];
             if (variant) {
-                oCtx.lineWidth = 2.0; oCtx.strokeStyle = '#000';
+                oCtx.lineWidth = 2.2; oCtx.strokeStyle = '#0f172a';
                 const yOffset = (variant.relativeBaseline || 0) * scale;
                 variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY + yOffset, scale));
-                curX += (variant.width * scale * 0.85) + 10; 
+                curX += (variant.width * scale * 0.9) + 12; 
             } else {
                 curX += 20;
             }
-            if (curX > oCanvas.width - 120) { curX = 50; curY += 150; }
+            if (curX > oCanvas.width - 140) { curX = 60; curY += 160; }
         }
     }
 
     function downloadModel() {
         const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v11.json'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'lutra_handwriting.json'; a.click();
     }
 
     function loadModel(e) {
@@ -293,9 +361,8 @@
         reader.onload = (event) => { 
             try {
                 modelData = JSON.parse(event.target.result);
-                alert("Model loaded!");
                 renderHandwriting(document.getElementById('textInput').value); 
-            } catch(e) { alert("Failed to load."); }
+            } catch(e) { alert("Load failed."); }
         };
         reader.readAsText(file);
     }
