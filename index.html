@@ -66,7 +66,7 @@
         
         <h3>The Logic</h3>
         <ul>
-            <li><strong>Coordinate Mapping:</strong> Every stroke is a collection of high-precision $(x, y)$ vectors. This isn't a font, but rather it's a simulation of motion.</li>
+            <li><strong>Coordinate Mapping:</strong> Every stroke is a collection of high-precision (x, y) vectors. This isn't a font, but rather it's a simulation of motion.</li>
             <li><strong>The Variant Lottery:</strong> Having 130+ variants means the chance of two identical letters appearing in the same paragraph is less than if you had only one variant per character, which makes it actually look like handwriting.</li>
             <li><strong>The Recursive Loop:</strong> The more you train, the more "Letter Trail" ghosts you create, allowing the model to understand the boundaries of your style without being rigid. (yap for "more variation the more you write")</li>
         </ul>
@@ -91,6 +91,7 @@
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?! ";
     const BASELINE_Y = 300;
     let currentIdx = 0, modelData = {}, letterStrokes = [], isDrawing = false, currentPath = [];
+    let lastActiveMode = 'training'; 
     
     const dCanvas = document.getElementById('drawCanvas'), dCtx = dCanvas.getContext('2d');
     const oCanvas = document.getElementById('outputCanvas'), oCtx = oCanvas.getContext('2d');
@@ -186,17 +187,37 @@
     function undoStroke() { letterStrokes.pop(); dCtx.clearRect(0,0,400,400); drawGuide(); dCtx.strokeStyle = '#0f172a'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
     
     function toggleMode() { 
-        const isTraining = !document.getElementById('training-ui').classList.contains('hidden');
-        document.getElementById('training-ui').classList.toggle('hidden', isTraining);
-        document.getElementById('typing-ui').classList.toggle('hidden', !isTraining);
+        const isTrainingVisible = !document.getElementById('training-ui').classList.contains('hidden');
+        lastActiveMode = isTrainingVisible ? 'typing' : 'training';
+        
+        document.getElementById('training-ui').classList.toggle('hidden', isTrainingVisible);
+        document.getElementById('typing-ui').classList.toggle('hidden', !isTrainingVisible);
         document.getElementById('wiki-ui').classList.add('hidden');
-        document.getElementById('mode-label').innerText = isTraining ? "Typing" : "Training";
-        document.getElementById('char-prompt').classList.toggle('hidden', isTraining);
-        if(isTraining) renderHandwriting(textInput.value);
+        
+        document.getElementById('mode-label').innerText = isTrainingVisible ? "Typing" : "Training";
+        document.getElementById('char-prompt').classList.toggle('hidden', isTrainingVisible);
+        if(isTrainingVisible) renderHandwriting(textInput.value);
     }
 
-    function showWiki() { document.getElementById('wiki-ui').classList.remove('hidden'); document.getElementById('training-ui').classList.add('hidden'); document.getElementById('typing-ui').classList.add('hidden'); }
-    function hideWiki() { document.getElementById('wiki-ui').classList.add('hidden'); document.getElementById('training-ui').classList.remove('hidden'); }
+    function showWiki() { 
+        const isTrainingVisible = !document.getElementById('training-ui').classList.contains('hidden');
+        lastActiveMode = isTrainingVisible ? 'training' : 'typing';
+        
+        document.getElementById('wiki-ui').classList.remove('hidden'); 
+        document.getElementById('training-ui').classList.add('hidden'); 
+        document.getElementById('typing-ui').classList.add('hidden'); 
+    }
+
+    function hideWiki() { 
+        document.getElementById('wiki-ui').classList.add('hidden'); 
+        if (lastActiveMode === 'training') {
+            document.getElementById('training-ui').classList.remove('hidden');
+        } else {
+            document.getElementById('typing-ui').classList.remove('hidden');
+            renderHandwriting(textInput.value);
+        }
+    }
+
     function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_model.json'; a.click(); }
     function loadModel(e) { const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); updateStats();}; r.readAsText(e.target.files[0]); }
     function exportPNG() { const l=document.createElement('a'); l.download='handwriting.png'; l.href=oCanvas.toDataURL('image/png'); l.click(); }
