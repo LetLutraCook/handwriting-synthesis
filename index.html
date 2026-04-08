@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>handwriting-synthesis-v23.5</title>
+    <title>handwriting-synthesis-v23.6</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -52,7 +52,11 @@
             <button onclick="undoStroke()">Undo</button>
             <button class="btn-filled" onclick="saveCurrentLetter()">Save & Next</button>
         </div>
-        <button style="width:100%; margin-top:10px; font-size:0.8rem;" onclick="resetIndex()">Restart Training Loop</button>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button style="flex:1; font-size:0.8rem;" onclick="prevChar()">Previous Char</button>
+            <button style="flex:1; font-size:0.8rem;" onclick="nextChar()">Next Char</button>
+        </div>
+        <button style="width:100%; margin-top:10px; font-size:0.8rem;" onclick="resetIndex()">Restart Loop</button>
     </div>
 
     <div id="typing-ui" class="type-area hidden">
@@ -67,9 +71,9 @@
     </div>
 
     <div id="wiki-ui" class="hidden" style="max-width:800px; padding:2rem;">
-        <h2>Handwriting with MATH Wiki</h2>
-        <p>Simulation of motion using coordinate mapping and vector paths.</p>
-        <button onclick="hideWiki()" style="margin-top:20px;">Back to App</button>
+        <h2>Handwriting Wiki</h2>
+        <p>Coordinate mapping and vector paths.</p>
+        <button onclick="hideWiki()" style="margin-top:20px;">Back</button>
     </div>
 </div>
 
@@ -84,7 +88,7 @@
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?! ";
     const BASELINE_Y = 300;
     let currentIdx = 0, modelData = {}, letterStrokes = [], isDrawing = false, currentPath = [];
-    let lastActiveMode = 'training', lastThreeSaved = []; 
+    let lastActiveMode = 'training'; 
     
     const dCanvas = document.getElementById('drawCanvas'), dCtx = dCanvas.getContext('2d');
     const oCanvas = document.getElementById('outputCanvas'), oCtx = oCanvas.getContext('2d');
@@ -96,11 +100,15 @@
         dCtx.setLineDash([6, 10]); dCtx.strokeStyle = '#e2e8f0'; dCtx.lineWidth = 2;
         dCtx.beginPath(); dCtx.moveTo(0, BASELINE_Y); dCtx.lineTo(dCanvas.width, BASELINE_Y); dCtx.stroke();
         
-        if (document.getElementById('set-trail').checked && lastThreeSaved.length > 0) {
+        const char = alphabet[currentIdx];
+        if (document.getElementById('set-trail').checked && modelData[char] && modelData[char].length > 0) {
             dCtx.globalAlpha = 0.15; dCtx.strokeStyle = '#6366f1';
+            
+            // Show only the last 3 variants of THIS specific character
+            const variantsToShow = modelData[char].slice(-3);
             let trailX = 20; 
-            lastThreeSaved.forEach(item => {
-                const v = item.variant;
+            
+            variantsToShow.forEach(v => {
                 v.strokes.forEach(stroke => {
                     dCtx.beginPath();
                     stroke.forEach((p, i) => {
@@ -109,7 +117,7 @@
                     });
                     dCtx.stroke();
                 });
-                trailX += (v.width * 0.5) + 25; 
+                trailX += (v.width * 0.5) + 30; 
             });
         }
         dCtx.restore();
@@ -143,12 +151,19 @@
         const newVariant = { strokes: letterStrokes.map(s=>s.map(p=>({x:p.x-minX,y:p.y-minY}))), width: maxX-minX, relativeBaseline: minY-BASELINE_Y };
         if (!modelData[char]) modelData[char] = [];
         modelData[char].push(newVariant); 
-        lastThreeSaved.push({ char, variant: newVariant });
-        if (lastThreeSaved.length > 3) lastThreeSaved.shift();
+        
+        // Auto-advance logic
         currentIdx = (currentIdx + 1) % alphabet.length;
-        document.getElementById('char-prompt').innerText = alphabet[currentIdx];
-        updateStats(); clearCanvas(); 
+        updateUI();
     }
+
+    function updateUI() {
+        document.getElementById('char-prompt').innerText = alphabet[currentIdx];
+        updateStats(); clearCanvas();
+    }
+
+    function prevChar() { currentIdx = (currentIdx - 1 + alphabet.length) % alphabet.length; updateUI(); }
+    function nextChar() { currentIdx = (currentIdx + 1) % alphabet.length; updateUI(); }
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
@@ -179,7 +194,7 @@
 
     function clearCanvas() { letterStrokes = []; drawGuide(); }
     function undoStroke() { letterStrokes.pop(); drawGuide(); dCtx.strokeStyle = '#0f172a'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
-    function resetIndex() { currentIdx = 0; document.getElementById('char-prompt').innerText = alphabet[currentIdx]; lastThreeSaved = []; clearCanvas(); }
+    function resetIndex() { currentIdx = 0; updateUI(); }
     function updateStats() { let total = 0; Object.values(modelData).forEach(v => total += v.length); document.getElementById('model-stats').innerText = `${Object.keys(modelData).length} characters, ${total} variants`; }
     function toggleMode() { const isT = !document.getElementById('training-ui').classList.contains('hidden'); lastActiveMode = isT ? 'typing' : 'training'; document.getElementById('training-ui').classList.toggle('hidden', isT); document.getElementById('typing-ui').classList.toggle('hidden', !isT); document.getElementById('wiki-ui').classList.add('hidden'); document.getElementById('mode-label').innerText = isT ? "Typing" : "Training"; document.getElementById('char-prompt').classList.toggle('hidden', isT); if(isT) renderHandwriting(textInput.value); }
     function showWiki() { const isT = !document.getElementById('training-ui').classList.contains('hidden'); lastActiveMode = isT ? 'training' : 'typing'; document.getElementById('wiki-ui').classList.remove('hidden'); document.getElementById('training-ui').classList.add('hidden'); document.getElementById('typing-ui').classList.add('hidden'); }
