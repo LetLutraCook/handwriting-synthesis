@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v5</title>
+    <title>Lutra Handwriting AI v6</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #1e293b; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -42,7 +42,7 @@
     </div>
 
     <div id="typing-ui" class="type-area hidden">
-        <textarea id="textInput" placeholder="Start typing..."></textarea>
+        <textarea id="textInput" placeholder="Type here..."></textarea>
         <canvas id="outputCanvas" width="1200" height="800"></canvas>
     </div>
 </div>
@@ -78,8 +78,7 @@
             e.preventDefault();
             isDrawing = true;
             const pos = getPos(e);
-            dCtx.beginPath();
-            dCtx.moveTo(pos.x, pos.y);
+            dCtx.beginPath(); dCtx.moveTo(pos.x, pos.y);
             currentPath = [pos];
         }
     }
@@ -91,12 +90,9 @@
         const lastPos = currentPath[currentPath.length - 1];
         const dist = Math.hypot(pos.x - lastPos.x, pos.y - lastPos.y);
         const speed = dist / Math.max(1, pos.t - lastPos.t);
-        
-        dCtx.lineWidth = Math.max(1.8, 5 - speed * 1.5);
-        dCtx.lineCap = 'round';
-        dCtx.strokeStyle = '#1e293b';
-        dCtx.lineTo(pos.x, pos.y);
-        dCtx.stroke();
+        dCtx.lineWidth = Math.max(2, 5 - speed * 1.2);
+        dCtx.lineCap = 'round'; dCtx.strokeStyle = '#1e293b';
+        dCtx.lineTo(pos.x, pos.y); dCtx.stroke();
         currentPath.push(pos);
     }
 
@@ -116,10 +112,7 @@
         dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height);
         letterStrokes.forEach(stroke => {
             dCtx.beginPath();
-            stroke.forEach((p, i) => {
-                if (i === 0) dCtx.moveTo(p.x, p.y);
-                else dCtx.lineTo(p.x, p.y);
-            });
+            stroke.forEach((p, i) => { if (i === 0) dCtx.moveTo(p.x, p.y); else dCtx.lineTo(p.x, p.y); });
             dCtx.stroke();
         });
     }
@@ -135,7 +128,8 @@
         modelData[alphabet[currentIdx]] = {
             strokes: letterStrokes.map(s => s.map(p => ({ x: p.x - minX, y: p.y - minY }))),
             width: maxX - minX,
-            height: maxY - minY
+            height: maxY - minY,
+            minY: minY // Captured to help with baseline alignment
         };
         currentIdx++;
         if (currentIdx < alphabet.length) document.getElementById('char-prompt').innerText = alphabet[currentIdx];
@@ -148,17 +142,13 @@
         if (!document.getElementById('typing-ui').classList.contains('hidden')) renderHandwriting(document.getElementById('textInput').value);
     }
 
-    // CATMULL-ROM SMOOTHING
     function drawSpline(ctx, points, curX, curY, scale) {
         if (points.length < 3) return;
-        ctx.beginPath();
-        ctx.moveTo(curX + points[0].x * scale, curY + points[0].y * scale);
+        ctx.beginPath(); ctx.moveTo(curX + points[0].x * scale, curY + points[0].y * scale);
         for (let i = 0; i < points.length - 1; i++) {
-            const p0 = points[i === 0 ? i : i - 1];
-            const p1 = points[i];
-            const p2 = points[i + 1];
+            const p0 = points[i === 0 ? i : i - 1], p1 = points[i], p2 = points[i + 1];
             const p3 = points[i + 2 === points.length ? i + 1 : i + 2];
-            for (let t = 0; t <= 1; t += 0.15) {
+            for (let t = 0; t <= 1; t += 0.2) {
                 const t2 = t * t, t3 = t2 * t;
                 const x = 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3);
                 const y = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
@@ -172,17 +162,23 @@
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
         let curX = 50, curY = 120;
         const scale = 0.35;
-        const letterSpacing = -5; // ADJUST THIS to tighten letters (negative = closer)
 
         for (let char of text) {
-            if (char === ' ') { curX += 45; continue; }
+            if (char === ' ') { curX += 40; continue; }
             if (char === '\n') { curX = 50; curY += 150; continue; }
             const variant = modelData[char];
             if (variant) {
-                oCtx.lineWidth = 2.2; oCtx.strokeStyle = '#000';
-                variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY, scale));
-                // THE FIX: Move cursor by width then apply the negative spacing
-                curX += (variant.width * scale) + letterSpacing;
+                oCtx.lineWidth = 2.0; oCtx.strokeStyle = '#000';
+                
+                // --- ALIGNMENT FIX ---
+                // We use a small vertical offset so 'g' drops lower and 'A' sits higher
+                const verticalOffset = (variant.height > 100) ? 0 : 10;
+                
+                variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY + verticalOffset, scale));
+                
+                // --- DYNAMIC SPACING FIX ---
+                // Move cursor by 85% of character width to create natural overlap
+                curX += (variant.width * scale * 0.85) + 4; 
             }
             if (curX > oCanvas.width - 120) { curX = 50; curY += 150; }
         }
@@ -190,12 +186,16 @@
 
     function downloadModel() {
         const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v5.json'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v6.json'; a.click();
     }
 
     function loadModel(e) {
         const reader = new FileReader();
-        reader.onload = (event) => { modelData = JSON.parse(event.target.result); alert("Model loaded!"); renderHandwriting(document.getElementById('textInput').value); };
+        reader.onload = (event) => { 
+            modelData = JSON.parse(event.target.result); 
+            alert("Model loaded!"); 
+            renderHandwriting(document.getElementById('textInput').value); 
+        };
         reader.readAsText(e.target.files[0]);
     }
 </script>
