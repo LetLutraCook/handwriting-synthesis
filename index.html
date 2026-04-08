@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Lutra Handwriting AI v8</title>
+    <title>Lutra Handwriting AI v9</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #1e293b; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -33,7 +33,6 @@
 
 <div class="main-container">
     <div id="training-ui" class="draw-card">
-        <div style="margin-bottom: 10px; font-size: 0.8rem; color: #64748b;">Draw relative to the bottom of the box (the baseline)</div>
         <canvas id="drawCanvas" width="400" height="400"></canvas>
         <div class="btn-group">
             <button onclick="clearCanvas()">Clear</button>
@@ -43,7 +42,7 @@
     </div>
 
     <div id="typing-ui" class="type-area hidden">
-        <textarea id="textInput" placeholder="Start typing..."></textarea>
+        <textarea id="textInput" placeholder="Type here..." oninput="renderHandwriting(this.value)"></textarea>
         <canvas id="outputCanvas" width="1200" height="800"></canvas>
     </div>
 </div>
@@ -129,9 +128,7 @@
         modelData[alphabet[currentIdx]] = {
             strokes: letterStrokes.map(s => s.map(p => ({ x: p.x - minX, y: p.y - minY }))),
             width: maxX - minX,
-            height: maxY - minY,
-            // Calculate how far the top of the letter is from the absolute bottom of the canvas
-            baselineY: dCanvas.height - minY 
+            height: maxY - minY
         };
         currentIdx++;
         if (currentIdx < alphabet.length) document.getElementById('char-prompt').innerText = alphabet[currentIdx];
@@ -168,17 +165,20 @@
         for (let char of text) {
             if (char === ' ') { curX += 40; continue; }
             if (char === '\n') { curX = 50; curY += 150; continue; }
+            
             const variant = modelData[char];
             if (variant) {
                 oCtx.lineWidth = 2.0; oCtx.strokeStyle = '#000';
                 
-                // --- THE HEIGHT FIX ---
-                // We use the recorded baselineY to align letters to a common line
-                // This prevents lowercase letters from floating too high.
-                const baselineShift = 100 - (variant.baselineY * scale);
+                // --- AUTO-CENTERING HEIGHT FIX ---
+                // We center the letter relative to a fixed 100px-high line segment
+                const centerY = (100 - (variant.height * scale)) / 2;
                 
-                variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY + baselineShift, scale));
+                variant.strokes.forEach(s => drawSpline(oCtx, s, curX, curY + centerY, scale));
                 curX += (variant.width * scale * 0.85) + 4; 
+            } else {
+                // Skip untrained letters but still move the cursor forward for flow
+                curX += 20;
             }
             if (curX > oCanvas.width - 120) { curX = 50; curY += 150; }
         }
@@ -186,7 +186,7 @@
 
     function downloadModel() {
         const blob = new Blob([JSON.stringify(modelData)], {type: 'application/json'});
-        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v8.json'; a.click();
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'handwriting_v9.json'; a.click();
     }
 
     function loadModel(e) {
@@ -197,7 +197,6 @@
             try {
                 modelData = JSON.parse(event.target.result);
                 alert("Model loaded!");
-                // IMMEDIATE RENDER FIX:
                 renderHandwriting(document.getElementById('textInput').value); 
             } catch(e) { alert("Failed to load."); }
         };
