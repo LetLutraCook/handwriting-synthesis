@@ -3,97 +3,239 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>handwriting-synthesis-v23.9</title>
+    <title>Handwriting Studio v24</title>
     <style>
-        :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0; }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body { 
-            font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; color: var(--text); 
-            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
-            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+        :root { 
+            --primary: #4f46e5; --primary-hover: #4338ca;
+            --bg: #f1f5f9; --panel: #ffffff; --text: #1e293b; 
+            --text-light: #64748b; --border: #e2e8f0; --accent: #818cf8;
         }
-        header { background: #fff; padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; z-index: 100; }
-        #char-prompt { background: #e0e7ff; color: var(--primary); padding: 4px 12px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; margin-left: 8px; }
-        #dataset-label { font-size: 0.75rem; color: #64748b; margin-left: 10px; font-weight: 400; }
-        .main-container { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 1.5rem; gap: 1rem; overflow-y: auto; padding-bottom: 120px; }
-        .card { background: var(--panel); padding: 1.5rem; border-radius: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); width: 100%; max-width: 500px; border: 1px solid var(--border); }
-        canvas#drawCanvas { background: #fdfdfd; border: 2px solid var(--border); border-radius: 16px; display: block; margin: 0 auto; cursor: crosshair; touch-action: none; }
-        .type-area { width: 100%; max-width: 1100px; display: flex; flex-direction: column; gap: 1rem; }
-        textarea { width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 1rem; min-height: 100px; outline: none; user-select: text !important; -webkit-user-select: text !important; }
-        #outputCanvas { border-radius: 16px; border: 1px solid var(--border); width: 100%; background: #fff; pointer-events: none; }
-        .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; background: #fff; padding: 15px; border-radius: 16px; border: 1px solid var(--border); margin-top: 10px; }
-        .setting-item { display: flex; flex-direction: column; gap: 5px; font-size: 0.8rem; font-weight: 600; color: #64748b; }
-        button { padding: 0.7rem 1.25rem; border-radius: 12px; border: 1px solid var(--border); background: white; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        .btn-filled { background: var(--primary); color: white; border: none; }
-        footer { position: fixed; bottom: 0; left: 0; right: 0; padding: 1.25rem; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(16px); border-top: 1px solid var(--border); display: flex; gap: 12px; justify-content: center; z-index: 100; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        body { 
+            font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); margin: 0; color: var(--text); 
+            height: 100vh; display: flex; overflow: hidden;
+        }
+
+        /* Sidebar Navigation */
+        nav { 
+            width: 280px; background: var(--panel); border-right: 1px solid var(--border); 
+            display: flex; flex-direction: column; padding: 1.5rem; z-index: 100;
+        }
+        .logo { font-weight: 800; font-size: 1.25rem; color: var(--primary); margin-bottom: 2rem; display: flex; align-items: center; gap: 8px; }
+        .nav-group { margin-bottom: 1.5rem; }
+        .nav-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; color: var(--text-light); letter-spacing: 0.05em; margin-bottom: 0.75rem; display: block; }
+        
+        .mode-btn { 
+            width: 100%; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid transparent;
+            background: transparent; color: var(--text-light); font-weight: 600; text-align: left;
+            cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 12px; margin-bottom: 0.5rem;
+        }
+        .mode-btn.active { background: #eff6ff; color: var(--primary); border-color: #dbeafe; }
+        .mode-btn:hover:not(.active) { background: #f8fafc; color: var(--text); }
+
+        /* Main Workspace */
+        main { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+        header { 
+            padding: 1rem 2rem; background: var(--panel); border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .status-badge { background: #f1f5f9; padding: 4px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: 600; color: var(--text-light); }
+
+        .content-area { flex: 1; padding: 2rem; display: flex; justify-content: center; align-items: flex-start; overflow-y: auto; }
+
+        /* Training Card */
+        .stage { width: 100%; max-width: 600px; display: none; animation: fadeIn 0.3s ease; }
+        .stage.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .canvas-container { 
+            background: white; border-radius: 24px; padding: 2rem; border: 1px solid var(--border);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05); position: relative;
+        }
+        .canvas-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .char-display { font-size: 3rem; font-weight: 800; color: var(--primary); line-height: 1; }
+        
+        canvas { background: #fafafa; border: 2px solid var(--border); border-radius: 16px; cursor: crosshair; touch-action: none; width: 100%; }
+
+        /* Controls */
+        .btn-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 1.5rem; }
+        .btn { 
+            padding: 0.8rem; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;
+            border: 1px solid var(--border); background: white; font-size: 0.9rem;
+        }
+        .btn-primary { background: var(--primary); color: white; border: none; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn:active { transform: scale(0.98); }
+
+        /* Typing View */
+        .editor-layout { display: flex; flex-direction: column; gap: 1.5rem; width: 100%; max-width: 1000px; }
+        textarea { 
+            width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 1.5rem; 
+            min-height: 120px; font-size: 1rem; resize: vertical; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+        }
+        .settings-bar { 
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); 
+            gap: 1.5rem; background: white; padding: 1.5rem; border-radius: 16px; border: 1px solid var(--border);
+        }
+        .input-group { display: flex; flex-direction: column; gap: 8px; }
+        .input-group label { font-size: 0.75rem; font-weight: 700; color: var(--text-light); }
+        input[type="range"] { accent-color: var(--primary); cursor: pointer; }
+
+        /* Info/Wiki Tooltip */
+        .tip { font-size: 0.85rem; color: var(--text-light); margin-top: 1rem; display: flex; align-items: flex-start; gap: 8px; }
+        .tip svg { flex-shrink: 0; color: var(--accent); }
+
         .hidden { display: none !important; }
-        .stats { font-size: 0.75rem; color: #64748b; margin-top: 8px; text-align: center; }
     </style>
 </head>
-<body oncontextmenu="return false;">
+<body>
 
-<header>
-    <div style="font-weight: 600;">Mode: <span id="mode-label">Training</span><span id="char-prompt">A</span><span id="dataset-label">Set 1</span></div>
-    <div style="display:flex; gap:10px;">
-        <button onclick="showWiki()">Project Wiki</button>
-        <button class="btn-filled" onclick="toggleMode()">Switch Mode</button>
-    </div>
-</header>
-
-<div class="main-container">
-    <div id="training-ui" class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <span style="font-size:0.85rem; color:#64748b;">Draw on the baseline</span>
-            <label style="font-size:0.8rem; font-weight:600;"><input type="checkbox" id="set-trail" checked onchange="drawGuide()"> Letter Trail</label>
-        </div>
-        <canvas id="drawCanvas" width="400" height="400"></canvas>
-        <div id="model-stats" class="stats">0 characters, 0 total variants</div>
-        <div style="display:flex; gap:10px; margin-top:20px; justify-content:center;">
-            <button onclick="clearCanvas()">Clear</button>
-            <button onclick="undoStroke()">Undo</button>
-            <button class="btn-filled" onclick="saveCurrentLetter()">Save & Next</button>
-        </div>
-        <div style="display:flex; gap:10px; margin-top:10px;">
-            <button style="flex:1; font-size:0.8rem;" onclick="prevChar()">Previous Char</button>
-            <button style="flex:1; font-size:0.8rem;" onclick="nextChar()">Next Char</button>
-        </div>
-        <button style="width:100%; margin-top:10px; font-size:0.8rem;" onclick="resetIndex()">Reset to Start</button>
+<nav>
+    <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path><path d="M2 2l7.586 7.586"></path><circle cx="11" cy="11" r="2"></circle></svg>
+        Studio v24
     </div>
 
-    <div id="typing-ui" class="type-area hidden">
-        <textarea id="textInput" placeholder="Enter your text here..." oninput="renderHandwriting(this.value)"></textarea>
-        <div class="settings-grid">
-            <div class="setting-item">Word Spacing <input type="range" id="word-space" min="20" max="150" value="80" oninput="renderHandwriting(textInput.value)"></div>
-            <div class="setting-item">Letter Spacing <input type="range" id="char-space" min="0" max="50" value="10" oninput="renderHandwriting(textInput.value)"></div>
-            <div class="setting-item">Line Height <input type="range" id="line-height" min="100" max="500" value="300" oninput="renderHandwriting(textInput.value)"></div>
-            <div class="setting-item">Height Variation <input type="range" id="h-var" min="0" max="100" value="20" oninput="renderHandwriting(textInput.value)"></div>
-            <div class="setting-item">Thickness <input type="range" id="thickness" min="1" max="10" value="4.5" step="0.5" oninput="renderHandwriting(textInput.value)"></div>
+    <div class="nav-group">
+        <span class="nav-label">Workspace</span>
+        <button class="mode-btn active" id="btn-train" onclick="switchTab('training')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            Training Mode
+        </button>
+        <button class="mode-btn" id="btn-type" onclick="switchTab('typing')">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M6 8h12"></path><path d="M6 12h12"></path><path d="M6 16h12"></path></svg>
+            Typing Mode
+        </button>
+    </div>
+
+    <div class="nav-group">
+        <span class="nav-label">Library</span>
+        <button class="mode-btn" onclick="document.getElementById('fileInput').click()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Import Model
+        </button>
+        <button class="mode-btn" onclick="downloadModel()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            Export Model
+        </button>
+    </div>
+
+    <div style="margin-top: auto; border-top: 1px solid var(--border); padding-top: 1.5rem;">
+        <button class="mode-btn" onclick="toggleWiki()">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+            Project Wiki
+        </button>
+    </div>
+</nav>
+
+<main>
+    <header>
+        <div id="breadcrumb" style="font-weight: 600; font-size: 0.95rem;">Training Loop</div>
+        <div id="stat-count" class="status-badge">0 variants mapped</div>
+    </header>
+
+    <div class="content-area">
+        <div id="tab-training" class="stage active">
+            <div class="canvas-container">
+                <div class="canvas-header">
+                    <div>
+                        <div id="set-indicator" style="font-size:0.75rem; font-weight:700; color:var(--text-light); text-transform:uppercase;">Dataset 1</div>
+                        <div id="char-prompt" class="char-display">A</div>
+                    </div>
+                    <label style="font-size:0.8rem; font-weight:600; display:flex; align-items:center; gap:8px; cursor:pointer;">
+                        <input type="checkbox" id="set-trail" checked onchange="drawGuide()"> Trail
+                    </label>
+                </div>
+
+                <canvas id="drawCanvas" width="500" height="400"></canvas>
+                
+                <div class="btn-row">
+                    <button class="btn" onclick="undoStroke()">Undo</button>
+                    <button class="btn" onclick="clearCanvas()">Clear</button>
+                    <button class="btn btn-primary" onclick="saveCurrentLetter()">Save & Next</button>
+                </div>
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px;">
+                    <button class="btn" onclick="prevChar()">Previous Letter</button>
+                    <button class="btn" onclick="nextChar()">Skip Letter</button>
+                </div>
+
+                <div class="tip">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    Draw the letter on the dashed baseline. The "Trail" shows your last attempts for consistency.
+                </div>
+            </div>
         </div>
-        <canvas id="outputCanvas" width="2400" height="2400"></canvas>
-    </div>
 
-    <div id="wiki-ui" class="hidden" style="max-width:800px; padding:2rem;">
-        <h2>Project Wiki: Handwriting with MATH</h2>
-        <p>Simulation of motion using coordinate mapping and vector paths.</p>
-        <button onclick="hideWiki()" style="margin-top:20px;">Back to App</button>
-    </div>
-</div>
+        <div id="tab-typing" class="stage">
+            <div class="editor-layout">
+                <textarea id="textInput" placeholder="Start typing to see your handwriting..." oninput="renderHandwriting(this.value)"></textarea>
+                
+                <div class="settings-bar">
+                    <div class="input-group">
+                        <label>Word Spacing</label>
+                        <input type="range" id="word-space" min="20" max="150" value="70" oninput="renderHandwriting(textInput.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Letter Spacing</label>
+                        <input type="range" id="char-space" min="-5" max="40" value="8" oninput="renderHandwriting(textInput.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Line Height</label>
+                        <input type="range" id="line-height" min="100" max="600" value="280" oninput="renderHandwriting(textInput.value)">
+                    </div>
+                    <div class="input-group">
+                        <label>Variability</label>
+                        <input type="range" id="h-var" min="0" max="80" value="15" oninput="renderHandwriting(textInput.value)">
+                    </div>
+                </div>
 
-<footer>
-    <button onclick="downloadModel()">Save Model</button>
-    <button onclick="document.getElementById('fileInput').click()">Load Model</button>
-    <button class="btn-filled" onclick="exportPNG()">Export PNG</button>
-    <input type="file" id="fileInput" class="hidden" onchange="loadModel(event)">
-</footer>
+                <div style="position:relative;">
+                    <canvas id="outputCanvas" width="2000" height="1500" style="background:white; border-radius:24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);"></canvas>
+                    <button class="btn btn-primary" style="position:absolute; top:20px; right:20px;" onclick="exportPNG()">Export PNG</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="tab-wiki" class="stage">
+            <div class="canvas-container" style="max-width:800px;">
+                <h2 style="margin-top:0;">The Physics of Ink</h2>
+                <p>This engine uses <strong>Quadratic Bezier Curves</strong> to simulate the fluid motion of a pen. Instead of rigid lines, the system calculates mid-points to remove jagged "digital" edges.</p>
+                <h3>How to use:</h3>
+                <ul>
+                    <li><strong>Datasets:</strong> The app tracks full alphabet sets. If you finish 'z' in Set 1, it automatically starts 'A' in Set 2.</li>
+                    <li><strong>Natural Drift:</strong> The "Variability" slider simulates human hand fatigue by shifting the baseline of each character slightly.</li>
+                </ul>
+                <button class="btn btn-primary" onclick="switchTab('training')">Back to Training</button>
+            </div>
+        </div>
+    </div>
+</main>
+
+<input type="file" id="fileInput" class="hidden" onchange="loadModel(event)">
 
 <script>
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?! ";
-    const BASELINE_Y = 300;
-    let globalIdx = 0, modelData = {}, letterStrokes = [], isDrawing = false, currentPath = [], lastActiveMode = 'training'; 
+    const BASELINE_Y = 280;
+    let globalIdx = 0, modelData = {}, letterStrokes = [], isDrawing = false, currentPath = [];
     
     const dCanvas = document.getElementById('drawCanvas'), dCtx = dCanvas.getContext('2d');
     const oCanvas = document.getElementById('outputCanvas'), oCtx = oCanvas.getContext('2d');
     const textInput = document.getElementById('textInput');
+
+    function switchTab(tabId) {
+        document.querySelectorAll('.stage').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + tabId).classList.add('active');
+        if(tabId === 'training') document.getElementById('btn-train').classList.add('active');
+        if(tabId === 'typing') {
+            document.getElementById('btn-type').classList.add('active');
+            renderHandwriting(textInput.value);
+        }
+        document.getElementById('breadcrumb').innerText = tabId.charAt(0).toUpperCase() + tabId.slice(1);
+    }
+
+    function toggleWiki() { switchTab('wiki'); }
 
     function getDatasetInfo(idx) {
         return { setNum: Math.floor(idx / alphabet.length) + 1, char: alphabet[idx % alphabet.length], variantIdx: Math.floor(idx / alphabet.length) };
@@ -118,17 +260,17 @@
     function drawGuide() {
         dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height);
         dCtx.save();
-        dCtx.setLineDash([6, 10]); dCtx.strokeStyle = '#e2e8f0'; dCtx.lineWidth = 2;
+        dCtx.setLineDash([5, 8]); dCtx.strokeStyle = '#cbd5e1'; dCtx.lineWidth = 2;
         dCtx.beginPath(); dCtx.moveTo(0, BASELINE_Y); dCtx.lineTo(dCanvas.width, BASELINE_Y); dCtx.stroke();
         
         const info = getDatasetInfo(globalIdx);
         if (document.getElementById('set-trail').checked && modelData[info.char]) {
-            dCtx.globalAlpha = 0.15; dCtx.strokeStyle = '#6366f1'; dCtx.lineWidth = 3;
+            dCtx.globalAlpha = 0.15; dCtx.strokeStyle = '#4f46e5'; dCtx.lineWidth = 3;
             const variants = modelData[info.char].slice(-3);
-            let trailX = 20; 
+            let trailX = 30; 
             variants.forEach(v => {
                 drawSmoothStrokes(dCtx, v.strokes, trailX, BASELINE_Y + v.relativeBaseline, 1);
-                trailX += (v.width * 0.5) + 30; 
+                trailX += (v.width * 0.4) + 40; 
             });
         }
         dCtx.restore();
@@ -145,9 +287,7 @@
     function startDraw(e) { e.preventDefault(); isDrawing = true; const p = getPos(e); dCtx.beginPath(); dCtx.moveTo(p.x, p.y); currentPath = [p]; }
     function moveDraw(e) {
         if (!isDrawing) return; e.preventDefault();
-        const p = getPos(e); const last = currentPath[currentPath.length-1];
-        const speed = Math.hypot(p.x - last.x, p.y - last.y) / Math.max(1, p.t - last.t);
-        dCtx.lineWidth = Math.max(2.2, 5.5 - speed * 1.5); dCtx.lineCap = 'round'; dCtx.strokeStyle = '#0f172a';
+        const p = getPos(e); dCtx.lineWidth = 4; dCtx.lineCap = 'round'; dCtx.strokeStyle = '#1e293b';
         dCtx.lineTo(p.x, p.y); dCtx.stroke(); currentPath.push(p);
     }
     function endDraw() { if (isDrawing) { letterStrokes.push([...currentPath]); isDrawing = false; } }
@@ -162,20 +302,24 @@
         const newVariant = { strokes: letterStrokes.map(s=>s.map(p=>({x:p.x-minX,y:p.y-minY}))), width: maxX-minX, relativeBaseline: minY-BASELINE_Y };
         if (!modelData[info.char]) modelData[info.char] = [];
         modelData[info.char][info.variantIdx] = newVariant;
-        globalIdx++;
-        updateUI();
+        globalIdx++; updateUI();
     }
 
     function prevChar() { if (globalIdx > 0) { globalIdx--; updateUI(); } }
     function nextChar() { globalIdx++; updateUI(); }
-    function updateUI() { const info = getDatasetInfo(globalIdx); document.getElementById('char-prompt').innerText = info.char; document.getElementById('dataset-label').innerText = `Set ${info.setNum}`; updateStats(); clearCanvas(); }
+    
+    function updateUI() { 
+        const info = getDatasetInfo(globalIdx); 
+        document.getElementById('char-prompt').innerText = info.char; 
+        document.getElementById('set-indicator').innerText = `Dataset ${info.setNum}`; 
+        updateStats(); clearCanvas(); 
+    }
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
         const wSpace = parseInt(document.getElementById('word-space').value), cSpace = parseInt(document.getElementById('char-space').value);
-        const lHeight = parseInt(document.getElementById('line-height').value), thickness = parseFloat(document.getElementById('thickness').value), hVar = parseInt(document.getElementById('h-var').value);
-        const margin = 100, scale = 0.85;
-        let curX = margin, curY = lHeight;
+        const lHeight = parseInt(document.getElementById('line-height').value), hVar = parseInt(document.getElementById('h-var').value);
+        const margin = 100, scale = 0.85; let curX = margin, curY = lHeight;
 
         text.split('\n').forEach(line => {
             curX = margin;
@@ -183,38 +327,25 @@
                 if (word === '') return;
                 if (word.trim() === '') { curX += wSpace; return; }
 
-                // Calculate word width for wrap logic
-                let wordWidth = 0;
-                let wordVariants = [];
+                let wordWidth = 0, wordVariants = [];
                 for (let char of word) {
                     const variants = modelData[char];
                     if (variants && variants.length > 0) {
                         const v = variants[Math.floor(Math.random() * variants.length)];
                         wordVariants.push(v);
                         wordWidth += (v.width * scale) + cSpace;
-                    } else {
-                        wordWidth += 25;
-                        wordVariants.push(null);
-                    }
+                    } else { wordWidth += 25; wordVariants.push(null); }
                 }
 
-                // Check if word fits, if not wrap to next line
-                if (curX + wordWidth > oCanvas.width - margin) {
-                    curX = margin;
-                    curY += lHeight;
-                }
+                if (curX + wordWidth > oCanvas.width - margin) { curX = margin; curY += lHeight; }
 
-                // Draw word
                 wordVariants.forEach(v => {
                     if (v) {
                         const drift = (Math.random() - 0.5) * hVar;
-                        oCtx.save(); oCtx.strokeStyle = '#1e293b'; oCtx.lineWidth = thickness; oCtx.lineCap = 'round';
+                        oCtx.save(); oCtx.strokeStyle = '#1e293b'; oCtx.lineWidth = 4.5; oCtx.lineCap = 'round';
                         drawSmoothStrokes(oCtx, v.strokes, curX, curY + (v.relativeBaseline * scale) + drift, scale);
-                        oCtx.restore();
-                        curX += (v.width * scale) + cSpace;
-                    } else {
-                        curX += 25;
-                    }
+                        oCtx.restore(); curX += (v.width * scale) + cSpace;
+                    } else { curX += 25; }
                 });
             });
             curY += lHeight;
@@ -222,13 +353,9 @@
     }
 
     function clearCanvas() { letterStrokes = []; drawGuide(); }
-    function undoStroke() { letterStrokes.pop(); drawGuide(); dCtx.strokeStyle = '#0f172a'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
-    function resetIndex() { globalIdx = 0; updateUI(); }
-    function updateStats() { let total = 0; Object.values(modelData).forEach(v => total += v.length); document.getElementById('model-stats').innerText = `${Object.keys(modelData).length} chars, ${total} total variants`; }
-    function toggleMode() { const isT = !document.getElementById('training-ui').classList.contains('hidden'); lastActiveMode = isT ? 'typing' : 'training'; document.getElementById('training-ui').classList.toggle('hidden', isT); document.getElementById('typing-ui').classList.toggle('hidden', !isT); document.getElementById('wiki-ui').classList.add('hidden'); document.getElementById('mode-label').innerText = isT ? "Typing" : "Training"; document.getElementById('char-prompt').classList.toggle('hidden', isT); if(isT) renderHandwriting(textInput.value); }
-    function showWiki() { const isT = !document.getElementById('training-ui').classList.contains('hidden'); lastActiveMode = isT ? 'training' : 'typing'; document.getElementById('wiki-ui').classList.remove('hidden'); document.getElementById('training-ui').classList.add('hidden'); document.getElementById('typing-ui').classList.add('hidden'); }
-    function hideWiki() { document.getElementById('wiki-ui').classList.add('hidden'); if (lastActiveMode === 'training') document.getElementById('training-ui').classList.remove('hidden'); else { document.getElementById('typing-ui').classList.remove('hidden'); renderHandwriting(textInput.value); } }
-    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_model.json'; a.click(); }
+    function undoStroke() { letterStrokes.pop(); drawGuide(); letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
+    function updateStats() { let total = 0; Object.values(modelData).forEach(v => total += v.length); document.getElementById('stat-count').innerText = `${total} variants mapped`; }
+    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_v24.json'; a.click(); }
     function loadModel(e) { const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); updateStats();}; r.readAsText(e.target.files[0]); }
     function exportPNG() { const l=document.createElement('a'); l.download='handwriting.png'; l.href=oCanvas.toDataURL('image/png'); l.click(); }
 </script>
