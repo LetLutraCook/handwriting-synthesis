@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>handwriting-synthesis-v23.8</title>
+    <title>handwriting-synthesis-v23.9</title>
     <style>
         :root { --primary: #6366f1; --bg: #f8fafc; --panel: #ffffff; --text: #0f172a; --border: #e2e8f0; }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -19,7 +19,6 @@
         .card { background: var(--panel); padding: 1.5rem; border-radius: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); width: 100%; max-width: 500px; border: 1px solid var(--border); }
         canvas#drawCanvas { background: #fdfdfd; border: 2px solid var(--border); border-radius: 16px; display: block; margin: 0 auto; cursor: crosshair; touch-action: none; }
         .type-area { width: 100%; max-width: 1100px; display: flex; flex-direction: column; gap: 1rem; }
-        .wiki-section { max-width: 800px; line-height: 1.6; color: #475569; padding-bottom: 40px; }
         textarea { width: 100%; border: 1px solid var(--border); border-radius: 16px; padding: 1rem; min-height: 100px; outline: none; user-select: text !important; -webkit-user-select: text !important; }
         #outputCanvas { border-radius: 16px; border: 1px solid var(--border); width: 100%; background: #fff; pointer-events: none; }
         .settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; background: #fff; padding: 15px; border-radius: 16px; border: 1px solid var(--border); margin-top: 10px; }
@@ -70,18 +69,12 @@
             <div class="setting-item">Height Variation <input type="range" id="h-var" min="0" max="100" value="20" oninput="renderHandwriting(textInput.value)"></div>
             <div class="setting-item">Thickness <input type="range" id="thickness" min="1" max="10" value="4.5" step="0.5" oninput="renderHandwriting(textInput.value)"></div>
         </div>
-        <canvas id="outputCanvas" width="2400" height="1200"></canvas>
+        <canvas id="outputCanvas" width="2400" height="2400"></canvas>
     </div>
 
-    <div id="wiki-ui" class="wiki-section hidden">
+    <div id="wiki-ui" class="hidden" style="max-width:800px; padding:2rem;">
         <h2>Project Wiki: Handwriting with MATH</h2>
-        <p><strong>Why this exists:</strong> Because I'm too lazy to write out my work on paper.</p>
-        <h3>The Logic</h3>
-        <ul>
-            <li><strong>Coordinate Mapping:</strong> Every stroke is a collection of high-precision $(x, y)$ vectors. This isn't a font, but rather it's a simulation of motion.</li>
-            <li><strong>The Variant Lottery:</strong> Having 130+ variants means the chance of two identical letters appearing in the same paragraph is minimized.</li>
-            <li><strong>The Recursive Loop:</strong> The more you train, the more "Letter Trail" ghosts you create, showing your last 3 saved variants for consistency.</li>
-        </ul>
+        <p>Simulation of motion using coordinate mapping and vector paths.</p>
         <button onclick="hideWiki()" style="margin-top:20px;">Back to App</button>
     </div>
 </div>
@@ -106,8 +99,7 @@
         return { setNum: Math.floor(idx / alphabet.length) + 1, char: alphabet[idx % alphabet.length], variantIdx: Math.floor(idx / alphabet.length) };
     }
 
-    // Bezier smoothing function to remove jagged edges
-    function drawSmoothStrokes(ctx, strokes, offsetX, offsetY, scale, isGhost) {
+    function drawSmoothStrokes(ctx, strokes, offsetX, offsetY, scale) {
         ctx.beginPath();
         strokes.forEach(stroke => {
             if (stroke.length < 2) return;
@@ -135,7 +127,7 @@
             const variants = modelData[info.char].slice(-3);
             let trailX = 20; 
             variants.forEach(v => {
-                drawSmoothStrokes(dCtx, v.strokes, trailX, BASELINE_Y + v.relativeBaseline, 1, true);
+                drawSmoothStrokes(dCtx, v.strokes, trailX, BASELINE_Y + v.relativeBaseline, 1);
                 trailX += (v.width * 0.5) + 30; 
             });
         }
@@ -182,21 +174,48 @@
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
         const wSpace = parseInt(document.getElementById('word-space').value), cSpace = parseInt(document.getElementById('char-space').value);
         const lHeight = parseInt(document.getElementById('line-height').value), thickness = parseFloat(document.getElementById('thickness').value), hVar = parseInt(document.getElementById('h-var').value);
-        let curX = 100, curY = lHeight; const scale = 0.85; 
+        const margin = 100, scale = 0.85;
+        let curX = margin, curY = lHeight;
+
         text.split('\n').forEach(line => {
-            curX = 100;
+            curX = margin;
             line.split(/(\s+)/).forEach(word => {
+                if (word === '') return;
                 if (word.trim() === '') { curX += wSpace; return; }
+
+                // Calculate word width for wrap logic
+                let wordWidth = 0;
+                let wordVariants = [];
                 for (let char of word) {
                     const variants = modelData[char];
                     if (variants && variants.length > 0) {
                         const v = variants[Math.floor(Math.random() * variants.length)];
+                        wordVariants.push(v);
+                        wordWidth += (v.width * scale) + cSpace;
+                    } else {
+                        wordWidth += 25;
+                        wordVariants.push(null);
+                    }
+                }
+
+                // Check if word fits, if not wrap to next line
+                if (curX + wordWidth > oCanvas.width - margin) {
+                    curX = margin;
+                    curY += lHeight;
+                }
+
+                // Draw word
+                wordVariants.forEach(v => {
+                    if (v) {
                         const drift = (Math.random() - 0.5) * hVar;
                         oCtx.save(); oCtx.strokeStyle = '#1e293b'; oCtx.lineWidth = thickness; oCtx.lineCap = 'round';
-                        drawSmoothStrokes(oCtx, v.strokes, curX, curY + (v.relativeBaseline * scale) + drift, scale, false);
-                        oCtx.restore(); curX += (v.width * scale) + cSpace;
-                    } else { curX += 25; }
-                }
+                        drawSmoothStrokes(oCtx, v.strokes, curX, curY + (v.relativeBaseline * scale) + drift, scale);
+                        oCtx.restore();
+                        curX += (v.width * scale) + cSpace;
+                    } else {
+                        curX += 25;
+                    }
+                });
             });
             curY += lHeight;
         });
@@ -205,7 +224,7 @@
     function clearCanvas() { letterStrokes = []; drawGuide(); }
     function undoStroke() { letterStrokes.pop(); drawGuide(); dCtx.strokeStyle = '#0f172a'; letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
     function resetIndex() { globalIdx = 0; updateUI(); }
-    function updateStats() { let total = 0; Object.values(modelData).forEach(v => total += v.length); document.getElementById('model-stats').innerText = `${Object.keys(modelData).length} chars, ${total} variants`; }
+    function updateStats() { let total = 0; Object.values(modelData).forEach(v => total += v.length); document.getElementById('model-stats').innerText = `${Object.keys(modelData).length} chars, ${total} total variants`; }
     function toggleMode() { const isT = !document.getElementById('training-ui').classList.contains('hidden'); lastActiveMode = isT ? 'typing' : 'training'; document.getElementById('training-ui').classList.toggle('hidden', isT); document.getElementById('typing-ui').classList.toggle('hidden', !isT); document.getElementById('wiki-ui').classList.add('hidden'); document.getElementById('mode-label').innerText = isT ? "Typing" : "Training"; document.getElementById('char-prompt').classList.toggle('hidden', isT); if(isT) renderHandwriting(textInput.value); }
     function showWiki() { const isT = !document.getElementById('training-ui').classList.contains('hidden'); lastActiveMode = isT ? 'training' : 'typing'; document.getElementById('wiki-ui').classList.remove('hidden'); document.getElementById('training-ui').classList.add('hidden'); document.getElementById('typing-ui').classList.add('hidden'); }
     function hideWiki() { document.getElementById('wiki-ui').classList.add('hidden'); if (lastActiveMode === 'training') document.getElementById('training-ui').classList.remove('hidden'); else { document.getElementById('typing-ui').classList.remove('hidden'); renderHandwriting(textInput.value); } }
