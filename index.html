@@ -11,79 +11,82 @@
             --text-light: #64748b; --border: #e2e8f0; --accent: #818cf8;
         }
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
-        
         body { 
             font-family: 'Inter', -apple-system, sans-serif; background: var(--bg); margin: 0; color: var(--text); 
-            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+            height: 100vh; display: flex; overflow: hidden;
         }
 
-        /* Responsive Layout Container */
-        .app-container { display: flex; flex: 1; height: 100%; overflow: hidden; }
-
-        /* Sidebar Navigation - Collapses on mobile */
+        /* Sidebar Navigation */
         nav { 
-            width: 260px; background: var(--panel); border-right: 1px solid var(--border); 
+            width: 240px; background: var(--panel); border-right: 1px solid var(--border); 
             display: flex; flex-direction: column; padding: 1.25rem; z-index: 100;
-            transition: transform 0.3s ease;
         }
-        
-        @media (max-width: 850px) {
-            nav { position: absolute; height: 100%; transform: translateX(-100%); width: 240px; }
-            nav.open { transform: translateX(0); box-shadow: 10px 0 30px rgba(0,0,0,0.1); }
-            .menu-toggle { display: block !important; }
-        }
-
-        .menu-toggle { 
-            display: none; background: var(--primary); color: white; border: none; 
-            padding: 8px; border-radius: 8px; cursor: pointer; margin-right: 15px;
-        }
-
-        .logo { font-weight: 800; font-size: 1.1rem; color: var(--primary); margin-bottom: 2rem; display: flex; align-items: center; gap: 8px; }
-        .nav-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-light); letter-spacing: 0.05em; margin-bottom: 0.75rem; display: block; }
+        .logo { font-weight: 800; font-size: 1.1rem; color: var(--primary); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 8px; }
+        .nav-group { margin-bottom: 1rem; }
+        .nav-label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; color: var(--text-light); letter-spacing: 0.05em; margin-bottom: 0.5rem; display: block; }
         
         .mode-btn { 
-            width: 100%; padding: 0.7rem 0.9rem; border-radius: 10px; border: 1px solid transparent;
+            width: 100%; padding: 0.6rem 0.8rem; border-radius: 10px; border: 1px solid transparent;
             background: transparent; color: var(--text-light); font-weight: 600; text-align: left;
-            cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 10px; margin-bottom: 0.4rem; font-size: 0.9rem;
+            cursor: pointer; transition: 0.2s; display: flex; align-items: center; gap: 10px; margin-bottom: 0.3rem; font-size: 0.85rem;
         }
         .mode-btn.active { background: #eff6ff; color: var(--primary); border-color: #dbeafe; }
+        .mode-btn:hover:not(.active) { background: #f8fafc; color: var(--text); }
 
         /* Main Workspace */
-        main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+        main { flex: 1; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         header { 
             padding: 0.75rem 1.5rem; background: var(--panel); border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; justify-content: space-between;
+            display: flex; justify-content: space-between; align-items: center; height: 50px;
+        }
+        .status-badge { background: #f1f5f9; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; color: var(--text-light); }
+
+        .content-area { 
+            flex: 1; padding: 1rem; display: flex; justify-content: center; align-items: center; 
+            overflow: hidden; /* Prevent scrolling on the main area */
         }
 
-        .content-area { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
-
-        /* Canvas Logic - Responsive Scaling */
-        .stage { width: 100%; max-width: 800px; display: none; }
-        .stage.active { display: block; }
+        /* Stages */
+        .stage { width: 100%; height: 100%; max-width: 900px; display: none; flex-direction: column; justify-content: center; }
+        .stage.active { display: flex; }
 
         .canvas-container { 
             background: white; border-radius: 20px; padding: 1.25rem; border: 1px solid var(--border);
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); width: 100%;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); position: relative;
+            max-height: 90vh; display: flex; flex-direction: column;
         }
+        .canvas-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; }
+        .char-display { font-size: 2.5rem; font-weight: 800; color: var(--primary); line-height: 1; }
         
-        canvas { 
-            background: #fafafa; border: 1px solid var(--border); border-radius: 12px; 
-            cursor: crosshair; touch-action: none; width: 100%; height: auto; max-width: 100%;
-        }
+        canvas#drawCanvas { background: #fafafa; border: 2px solid var(--border); border-radius: 12px; cursor: crosshair; touch-action: none; width: 100%; max-height: 320px; object-fit: contain; }
 
-        /* Utility classes */
+        /* Controls */
         .btn-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 1rem; }
-        .btn { padding: 0.7rem; border-radius: 10px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: white; font-size: 0.85rem; }
+        .btn { 
+            padding: 0.6rem; border-radius: 10px; font-weight: 600; cursor: pointer; transition: 0.1s;
+            border: 1px solid var(--border); background: white; font-size: 0.8rem;
+        }
         .btn-primary { background: var(--primary); color: white; border: none; }
-        
+        .btn-primary:hover { background: var(--primary-hover); }
+
+        /* Typing View Custom Height */
+        .editor-layout { display: flex; flex-direction: column; gap: 1rem; width: 100%; height: 100%; }
         textarea { 
             width: 100%; border: 1px solid var(--border); border-radius: 12px; padding: 1rem; 
-            min-height: 100px; font-size: 1rem; margin-bottom: 1rem;
+            height: 100px; font-size: 0.9rem; resize: none;
         }
-
         .settings-bar { 
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); 
-            gap: 1rem; background: white; padding: 1.25rem; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 1rem;
+            display: grid; grid-template-columns: repeat(4, 1fr); 
+            gap: 1rem; background: white; padding: 1rem; border-radius: 12px; border: 1px solid var(--border);
+        }
+        .input-group { display: flex; flex-direction: column; gap: 4px; }
+        .input-group label { font-size: 0.65rem; font-weight: 700; color: var(--text-light); }
+        input[type="range"] { height: 14px; }
+
+        .output-wrapper { flex: 1; position: relative; min-height: 0; }
+        #outputCanvas { 
+            background: white; border-radius: 16px; border: 1px solid var(--border); 
+            width: 100%; height: 100%; object-fit: contain;
         }
 
         .hidden { display: none !important; }
@@ -91,88 +94,87 @@
 </head>
 <body>
 
-<div class="app-container">
-    <nav id="sidebar">
-        <div class="logo">Studio v24.1</div>
-        <div class="nav-group">
-            <span class="nav-label">Workspace</span>
-            <button class="mode-btn active" id="btn-train" onclick="switchTab('training')">Training</button>
-            <button class="mode-btn" id="btn-type" onclick="switchTab('typing')">Typing</button>
-        </div>
-        <div class="nav-group" style="margin-top:20px;">
-            <span class="nav-label">Files</span>
-            <button class="mode-btn" onclick="downloadModel()">Export</button>
-            <button class="mode-btn" onclick="document.getElementById('fileInput').click()">Import</button>
-        </div>
-    </nav>
+<nav>
+    <div class="logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 19l7-7 3 3-7 7-3-3z"></path><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path></svg>
+        Studio v24.1
+    </div>
+    <div class="nav-group">
+        <span class="nav-label">Mode</span>
+        <button class="mode-btn active" id="btn-train" onclick="switchTab('training')">Training</button>
+        <button class="mode-btn" id="btn-type" onclick="switchTab('typing')">Typing</button>
+    </div>
+    <div class="nav-group">
+        <span class="nav-label">Data</span>
+        <button class="mode-btn" onclick="document.getElementById('fileInput').click()">Import</button>
+        <button class="mode-btn" onclick="downloadModel()">Export</button>
+        <button class="mode-btn" onclick="exportPNG()">Export PNG</button>
+    </div>
+</nav>
 
-    <main>
-        <header>
-            <div style="display:flex; align-items:center;">
-                <button class="menu-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">☰</button>
-                <div id="breadcrumb" style="font-weight: 600;">Training</div>
-            </div>
-            <div id="stat-count" style="font-size:0.8rem; color:var(--text-light);">0 variants</div>
-        </header>
+<main>
+    <header>
+        <div id="breadcrumb" style="font-weight: 600; font-size: 0.8rem; color: var(--text-light);">Training Loop</div>
+        <div id="stat-count" class="status-badge">0 variants</div>
+    </header>
 
-        <div class="content-area">
-            <div id="tab-training" class="stage active">
-                <div class="canvas-container">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <div id="char-prompt" style="font-size:2.5rem; font-weight:800; color:var(--primary);">A</div>
-                        <span id="set-indicator" style="font-size:0.7rem; font-weight:700; color:var(--text-light);">Set 1</span>
+    <div class="content-area">
+        <div id="tab-training" class="stage active">
+            <div class="canvas-container">
+                <div class="canvas-header">
+                    <div>
+                        <div id="set-indicator" style="font-size:0.6rem; font-weight:800; color:var(--text-light);">DATASET 1</div>
+                        <div id="char-prompt" class="char-display">A</div>
                     </div>
-                    <canvas id="drawCanvas" width="500" height="400"></canvas>
-                    <div class="btn-row">
-                        <button class="btn" onclick="undoStroke()">Undo</button>
-                        <button class="btn" onclick="clearCanvas()">Clear</button>
-                        <button class="btn btn-primary" onclick="saveCurrentLetter()">Save</button>
-                    </div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
-                        <button class="btn" onclick="prevChar()">Previous</button>
-                        <button class="btn" onclick="nextChar()">Skip</button>
-                    </div>
+                    <label style="font-size:0.7rem; font-weight:700;"><input type="checkbox" id="set-trail" checked onchange="drawGuide()"> Trail</label>
+                </div>
+                <canvas id="drawCanvas" width="500" height="350"></canvas>
+                <div class="btn-row">
+                    <button class="btn" onclick="undoStroke()">Undo</button>
+                    <button class="btn" onclick="clearCanvas()">Clear</button>
+                    <button class="btn btn-primary" onclick="saveCurrentLetter()">Save & Next</button>
+                </div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
+                    <button class="btn" onclick="prevChar()">Prev</button>
+                    <button class="btn" onclick="nextChar()">Skip</button>
                 </div>
             </div>
+        </div>
 
-            <div id="tab-typing" class="stage">
+        <div id="tab-typing" class="stage">
+            <div class="editor-layout">
                 <textarea id="textInput" placeholder="Type here..." oninput="renderHandwriting(this.value)"></textarea>
                 <div class="settings-bar">
-                    <div style="display:flex; flex-direction:column; gap:4px;">
-                        <label style="font-size:0.7rem; font-weight:700;">Spacing</label>
-                        <input type="range" id="word-space" min="20" max="150" value="70" oninput="renderHandwriting(textInput.value)">
-                    </div>
-                    <div style="display:flex; flex-direction:column; gap:4px;">
-                        <label style="font-size:0.7rem; font-weight:700;">Line Height</label>
-                        <input type="range" id="line-height" min="100" max="600" value="280" oninput="renderHandwriting(textInput.value)">
-                    </div>
+                    <div class="input-group"><label>Words</label><input type="range" id="word-space" min="20" max="150" value="70" oninput="renderHandwriting(textInput.value)"></div>
+                    <div class="input-group"><label>Letters</label><input type="range" id="char-space" min="-5" max="40" value="8" oninput="renderHandwriting(textInput.value)"></div>
+                    <div class="input-group"><label>Lines</label><input type="range" id="line-height" min="100" max="400" value="250" oninput="renderHandwriting(textInput.value)"></div>
+                    <div class="input-group"><label>Drift</label><input type="range" id="h-var" min="0" max="60" value="15" oninput="renderHandwriting(textInput.value)"></div>
                 </div>
-                <canvas id="outputCanvas" width="1600" height="2000" style="background:white;"></canvas>
-                <button class="btn btn-primary" style="margin-top:10px; width:100%;" onclick="exportPNG()">Export Image</button>
+                <div class="output-wrapper">
+                    <canvas id="outputCanvas" width="2000" height="1200"></canvas>
+                </div>
             </div>
         </div>
-    </main>
-</div>
+    </div>
+</main>
 
 <input type="file" id="fileInput" class="hidden" onchange="loadModel(event)">
 
 <script>
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.?! ";
-    const BASELINE_Y = 280;
+    const BASELINE_Y = 250;
     let globalIdx = 0, modelData = {}, letterStrokes = [], isDrawing = false, currentPath = [];
     
     const dCanvas = document.getElementById('drawCanvas'), dCtx = dCanvas.getContext('2d');
     const oCanvas = document.getElementById('outputCanvas'), oCtx = oCanvas.getContext('2d');
     const textInput = document.getElementById('textInput');
 
-    function switchTab(id) {
+    function switchTab(tabId) {
         document.querySelectorAll('.stage').forEach(s => s.classList.remove('active'));
         document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('tab-' + id).classList.add('active');
-        document.getElementById('btn-' + id).classList.add('active');
-        document.getElementById('breadcrumb').innerText = id.charAt(0).toUpperCase() + id.slice(1);
-        if(window.innerWidth <= 850) document.getElementById('sidebar').classList.remove('open');
-        if(id === 'typing') renderHandwriting(textInput.value);
+        document.getElementById('tab-' + tabId).classList.add('active');
+        document.getElementById('btn-' + (tabId === 'training' ? 'train' : 'type')).classList.add('active');
+        if(tabId === 'typing') renderHandwriting(textInput.value);
     }
 
     function getDatasetInfo(idx) {
@@ -197,9 +199,21 @@
 
     function drawGuide() {
         dCtx.clearRect(0, 0, dCanvas.width, dCanvas.height);
-        dCtx.setLineDash([5, 8]); dCtx.strokeStyle = '#cbd5e1'; dCtx.lineWidth = 2;
+        dCtx.save();
+        dCtx.setLineDash([4, 6]); dCtx.strokeStyle = '#cbd5e1'; dCtx.lineWidth = 2;
         dCtx.beginPath(); dCtx.moveTo(0, BASELINE_Y); dCtx.lineTo(dCanvas.width, BASELINE_Y); dCtx.stroke();
-        dCtx.setLineDash([]);
+        
+        const info = getDatasetInfo(globalIdx);
+        if (document.getElementById('set-trail').checked && modelData[info.char]) {
+            dCtx.globalAlpha = 0.1; dCtx.strokeStyle = '#4f46e5'; dCtx.lineWidth = 3;
+            const variants = modelData[info.char].slice(-2);
+            let trailX = 40; 
+            variants.forEach(v => {
+                drawSmoothStrokes(dCtx, v.strokes, trailX, BASELINE_Y + v.relativeBaseline, 0.8);
+                trailX += (v.width * 0.4) + 50; 
+            });
+        }
+        dCtx.restore();
     }
     drawGuide();
 
@@ -210,11 +224,13 @@
         return { x: (clientX - rect.left) * (dCanvas.width / rect.width), y: (clientY - rect.top) * (dCanvas.height / rect.height) };
     }
 
-    function startDraw(e) { isDrawing = true; const p = getPos(e); currentPath = [p]; }
+    function startDraw(e) { e.preventDefault(); isDrawing = true; currentPath = [getPos(e)]; }
     function moveDraw(e) {
         if (!isDrawing) return; e.preventDefault();
         const p = getPos(e); dCtx.lineWidth = 4; dCtx.lineCap = 'round'; dCtx.strokeStyle = '#1e293b';
-        dCtx.lineTo(p.x, p.y); dCtx.stroke(); currentPath.push(p);
+        const last = currentPath[currentPath.length-1];
+        dCtx.beginPath(); dCtx.moveTo(last.x, last.y); dCtx.lineTo(p.x, p.y); dCtx.stroke();
+        currentPath.push(p);
     }
     function endDraw() { if (isDrawing) { letterStrokes.push([...currentPath]); isDrawing = false; } }
 
@@ -233,37 +249,34 @@
 
     function prevChar() { if (globalIdx > 0) { globalIdx--; updateUI(); } }
     function nextChar() { globalIdx++; updateUI(); }
-    
-    function updateUI() { 
-        const info = getDatasetInfo(globalIdx); 
-        document.getElementById('char-prompt').innerText = info.char; 
-        document.getElementById('set-indicator').innerText = `Set ${info.setNum}`; 
-        updateStats(); clearCanvas(); 
-    }
+    function updateUI() { const info = getDatasetInfo(globalIdx); document.getElementById('char-prompt').innerText = info.char; document.getElementById('set-indicator').innerText = `DATASET ${info.setNum}`; updateStats(); clearCanvas(); }
+    function updateStats() { let total = 0; Object.values(modelData).forEach(v => total += v.length); document.getElementById('stat-count').innerText = `${total} variants`; }
 
     function renderHandwriting(text) {
         oCtx.clearRect(0, 0, oCanvas.width, oCanvas.height);
-        const wSpace = parseInt(document.getElementById('word-space').value), lHeight = parseInt(document.getElementById('line-height').value);
+        const wSpace = parseInt(document.getElementById('word-space').value), cSpace = parseInt(document.getElementById('char-space').value);
+        const lHeight = parseInt(document.getElementById('line-height').value), hVar = parseInt(document.getElementById('h-var').value);
         const margin = 80, scale = 0.8; let curX = margin, curY = lHeight;
 
         text.split('\n').forEach(line => {
             curX = margin;
             line.split(/(\s+)/).forEach(word => {
-                if (word.trim() === '') { curX += wSpace; return; }
+                if (word === '' || word.trim() === '') { curX += wSpace; return; }
                 let wordWidth = 0, wordVariants = [];
                 for (let char of word) {
                     const variants = modelData[char];
                     if (variants && variants.length > 0) {
                         const v = variants[Math.floor(Math.random() * variants.length)];
-                        wordVariants.push(v); wordWidth += (v.width * scale) + 8;
+                        wordVariants.push(v); wordWidth += (v.width * scale) + cSpace;
                     } else { wordWidth += 25; wordVariants.push(null); }
                 }
                 if (curX + wordWidth > oCanvas.width - margin) { curX = margin; curY += lHeight; }
                 wordVariants.forEach(v => {
                     if (v) {
-                        oCtx.strokeStyle = '#1e293b'; oCtx.lineWidth = 4; oCtx.lineCap = 'round';
-                        drawSmoothStrokes(oCtx, v.strokes, curX, curY + (v.relativeBaseline * scale), scale);
-                        curX += (v.width * scale) + 8;
+                        const drift = (Math.random() - 0.5) * hVar;
+                        oCtx.save(); oCtx.strokeStyle = '#1e293b'; oCtx.lineWidth = 4; oCtx.lineCap = 'round';
+                        drawSmoothStrokes(oCtx, v.strokes, curX, curY + (v.relativeBaseline * scale) + drift, scale);
+                        oCtx.restore(); curX += (v.width * scale) + cSpace;
                     } else { curX += 25; }
                 });
             });
@@ -273,8 +286,7 @@
 
     function clearCanvas() { letterStrokes = []; drawGuide(); }
     function undoStroke() { letterStrokes.pop(); drawGuide(); letterStrokes.forEach(s=>{dCtx.beginPath();s.forEach((p,i)=>i===0?dCtx.moveTo(p.x,p.y):dCtx.lineTo(p.x,p.y));dCtx.stroke();}); }
-    function updateStats() { let total = 0; Object.values(modelData).forEach(v => total += v.length); document.getElementById('stat-count').innerText = `${total} variants`; }
-    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='model.json'; a.click(); }
+    function downloadModel() { const b=new Blob([JSON.stringify(modelData)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(b); a.download='handwriting_v24.json'; a.click(); }
     function loadModel(e) { const r=new FileReader(); r.onload=(ev)=>{modelData=JSON.parse(ev.target.result); updateStats();}; r.readAsText(e.target.files[0]); }
     function exportPNG() { const l=document.createElement('a'); l.download='handwriting.png'; l.href=oCanvas.toDataURL('image/png'); l.click(); }
 </script>
